@@ -1,3 +1,7 @@
+/**
+ * Modernized Home Screen for Star Limpiezas Mobile
+ * Elegant design with smooth animations and modern icons
+ */
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -7,11 +11,14 @@ import {
   Alert, 
   ScrollView, 
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Animated
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
 import { serviceService, utilityService } from '../services';
+import { modernTheme } from '../theme/ModernTheme';
+import ModernIcon, { IconButton, StatusIcon } from '../theme/ModernIcon';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -32,20 +39,27 @@ const HomeScreen = () => {
   });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     loadDashboardData();
+    // Animate content fade in
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: modernTheme.animations.timing.normal,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Obtener estadísticas usando utilityService
+      // Get statistics using utilityService
       const { data: statsData, error } = await utilityService.getDashboardStats();
 
       if (error) {
         console.error('Error loading dashboard stats:', error);
-        // Fallback: obtener servicios básicos
+        // Fallback: get basic services
         const { data: servicesData } = await serviceService.getUserServices(null, true);
         setStats({
           servicios: servicesData?.length || 0,
@@ -60,7 +74,7 @@ const HomeScreen = () => {
           usuarios: statsData.totalUsers || 0
         });
 
-        // Obtener servicios recientes
+        // Get recent services
         const { data: servicesData } = await serviceService.getUserServices(null, true);
         setServicios(servicesData?.slice(0, 3) || []);
       }
@@ -99,234 +113,259 @@ const HomeScreen = () => {
     navigation.navigate(screenName);
   };
 
+  const menuItems = userRole === 'admin' ? [
+    {
+      icon: 'cleaning',
+      title: 'Gestionar Servicios',
+      subtitle: 'Confirmar, cancelar, editar y crear servicios',
+      onPress: () => navigateToScreen('Servicios'),
+      color: modernTheme.colors.primary
+    },
+    {
+      icon: 'people',
+      title: 'Gestionar Clientes',
+      subtitle: 'Ver y administrar la lista de clientes',
+      onPress: () => navigateToScreen('Clientes'),
+      color: modernTheme.colors.secondary
+    },
+    {
+      icon: 'employee',
+      title: 'Gestionar Empleados',
+      subtitle: 'Administrar el equipo de trabajo',
+      onPress: () => navigateToScreen('Empleados'),
+      color: modernTheme.colors.accent
+    },
+    {
+      icon: 'admin',
+      title: 'Administrar Usuarios',
+      subtitle: 'Gestionar roles y permisos de usuarios',
+      onPress: () => navigateToScreen('AdminUsers'),
+      color: modernTheme.colors.warning
+    },
+    {
+      icon: 'bonus',
+      title: 'Bonificaciones',
+      subtitle: 'Gestionar programas de lealtad y descuentos',
+      onPress: () => navigateToScreen('Bonifications'),
+      color: modernTheme.colors.success
+    },
+    {
+      icon: 'chart',
+      title: 'Reportes',
+      subtitle: 'Ver reportes de todos los servicios',
+      onPress: () => navigateToScreen('Reports'),
+      color: modernTheme.colors.primary
+    }
+  ] : [
+    {
+      icon: 'cleaning',
+      title: 'Mis Servicios',
+      subtitle: 'Solicitar y ver el estado de mis servicios',
+      onPress: () => navigateToScreen('Servicios'),
+      color: modernTheme.colors.primary
+    },
+    {
+      icon: 'chart',
+      title: 'Mis Reportes',
+      subtitle: 'Ver reportes de mis servicios con filtros',
+      onPress: () => navigateToScreen('Reportes'),
+      color: modernTheme.colors.secondary
+    },
+    {
+      icon: 'person',
+      title: 'Mi Perfil',
+      subtitle: 'Editar mi información personal',
+      onPress: () => navigateToScreen('Perfil'),
+      color: modernTheme.colors.accent
+    }
+  ];
+
   return (
     <ScrollView 
       style={styles.container}
+      contentContainerStyle={styles.contentContainer}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl 
+          refreshing={refreshing} 
+          onRefresh={onRefresh}
+          colors={[modernTheme.colors.primary]}
+          tintColor={modernTheme.colors.primary}
+        />
       }
     >
-      {/* Header con información del usuario */}
+      {/* Modern Header with Gradient */}
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>
-          ¡Hola, {userName}!
-        </Text>
-        <Text style={styles.subtitle}>Gestión de Servicios de Limpieza</Text>
-        {userRole && (
-          <Text style={styles.roleText}>
-            Rol: {userRole === 'admin' ? 'Administrador' : 'Usuario'}
-          </Text>
-        )}
-        {!isEmailVerified && (
-          <View style={styles.warningContainer}>
-            <Text style={styles.warningText}>
-              ⚠️ Email no verificado
-            </Text>
+        <View style={styles.headerContent}>
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeEmoji}>✨</Text>
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeText}>
+                ¡Hola, {userName}!
+              </Text>
+              <Text style={styles.subtitle}>
+                {userRole === 'admin' ? 'Panel de Administración' : 'Mi Panel Personal'}
+              </Text>
+            </View>
           </View>
-        )}
+          
+          {userRole && (
+            <View style={styles.roleContainer}>
+              <StatusIcon 
+                status={userRole === 'admin' ? 'approved' : 'info'} 
+                size="sm"
+                style={styles.roleIcon}
+              />
+              <Text style={styles.roleText}>
+                {userRole === 'admin' ? 'Administrador' : 'Usuario'}
+              </Text>
+            </View>
+          )}
+          
+          {!isEmailVerified && (
+            <View style={styles.warningContainer}>
+              <ModernIcon name="warning" size="sm" color={modernTheme.colors.warning} />
+              <Text style={styles.warningText}>
+                Email no verificado
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Estadísticas */}
+      {/* Modern Statistics Cards */}
       <View style={styles.statsContainer}>
         <Text style={styles.statsTitle}>Resumen del Dashboard</Text>
         <View style={styles.statsGrid}>
-          <View style={[styles.statCard, { backgroundColor: '#3498db' }]}>
+          <View style={[
+            styles.statCard, 
+            { 
+              backgroundColor: modernTheme.colors.primary + '15',
+              borderLeftColor: modernTheme.colors.primary 
+            }
+          ]}>
+            <ModernIcon 
+              name="cleaning" 
+              size="lg" 
+              color={modernTheme.colors.primary}
+              style={styles.statIcon}
+            />
             <Text style={styles.statNumber}>{stats.servicios}</Text>
             <Text style={styles.statLabel}>Servicios</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: '#2ecc71' }]}>
+          
+          <View style={[
+            styles.statCard, 
+            { 
+              backgroundColor: modernTheme.colors.secondary + '15',
+              borderLeftColor: modernTheme.colors.secondary 
+            }
+          ]}>
+            <ModernIcon 
+              name="people" 
+              size="lg" 
+              color={modernTheme.colors.secondary}
+              style={styles.statIcon}
+            />
             <Text style={styles.statNumber}>{stats.clientes}</Text>
             <Text style={styles.statLabel}>Clientes</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: '#f39c12' }]}>
+          
+          <View style={[
+            styles.statCard, 
+            { 
+              backgroundColor: modernTheme.colors.accent + '15',
+              borderLeftColor: modernTheme.colors.accent 
+            }
+          ]}>
+            <ModernIcon 
+              name="user" 
+              size="lg" 
+              color={modernTheme.colors.accent}
+              style={styles.statIcon}
+            />
             <Text style={styles.statNumber}>{stats.usuarios}</Text>
             <Text style={styles.statLabel}>Usuarios</Text>
           </View>
         </View>
       </View>
 
-      {/* Servicios recientes */}
+      {/* Recent Services */}
       {servicios.length > 0 && (
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Servicios Recientes</Text>
           {servicios.map((servicio, index) => (
-            <View key={index} style={styles.serviceCard}>
-              <Text style={styles.serviceName}>{servicio.nombre || 'Servicio'}</Text>
+            <TouchableOpacity 
+              key={index} 
+              style={styles.serviceCard}
+              onPress={() => navigateToScreen('Servicios')}
+            >
+              <View style={styles.serviceHeader}>
+                <ModernIcon name="cleaning" size="md" color={modernTheme.colors.primary} />
+                <Text style={styles.serviceName}>{servicio.nombre || 'Servicio'}</Text>
+              </View>
               <Text style={styles.serviceDescription}>
                 {servicio.descripcion || 'Sin descripción disponible'}
               </Text>
               <Text style={styles.servicePrice}>
                 ${servicio.precio || 'N/A'}
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       )}
 
-      {/* Menú principal con navegación basada en rol */}
+      {/* Modern Menu */}
       <View style={styles.menuContainer}>
         <Text style={styles.menuTitle}>
           {userRole === 'admin' ? 'Panel de Administración' : 'Mi Panel de Usuario'}
         </Text>
 
-        {/* Menú para Administradores */}
-        {userRole === 'admin' && (
-          <>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('Servicios')}
-            >
-              <Text style={styles.menuButtonIcon}>🧹</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Gestionar Servicios</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Confirmar, cancelar, editar y crear servicios
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('Clientes')}
-            >
-              <Text style={styles.menuButtonIcon}>👥</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Gestionar Clientes</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Ver y administrar la lista de clientes
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('Empleados')}
-            >
-              <Text style={styles.menuButtonIcon}>👨‍💼</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Gestionar Empleados</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Administrar el equipo de trabajo
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-
-
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('AdminUsers')}
-            >
-              <Text style={styles.menuButtonIcon}>👑</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Administrar Usuarios</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Gestionar roles y permisos de usuarios
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('Bonifications')}
-            >
-              <Text style={styles.menuButtonIcon}>🎁</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Bonificaciones</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Gestionar programas de lealtad y descuentos
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('Reports')}
-            >
-              <Text style={styles.menuButtonIcon}>📊</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Reportes</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Ver reportes de todos los servicios
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {/* Menú para Usuarios */}
-        {userRole === 'user' && (
-          <>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('Servicios')}
-            >
-              <Text style={styles.menuButtonIcon}>🧹</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Mis Servicios</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Solicitar y ver el estado de mis servicios
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('Reportes')}
-            >
-              <Text style={styles.menuButtonIcon}>📊</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Mis Reportes</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Ver reportes de mis servicios con filtros
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => navigateToScreen('Perfil')}
-            >
-              <Text style={styles.menuButtonIcon}>👤</Text>
-              <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>Mi Perfil</Text>
-                <Text style={styles.menuButtonSubtext}>
-                  Editar mi información personal
-                </Text>
-              </View>
-              <Text style={styles.menuButtonArrow}>›</Text>
-            </TouchableOpacity>
-          </>
-        )}
+        {menuItems.map((item, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.menuItem}
+            onPress={item.onPress}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.menuItemIcon, { backgroundColor: item.color + '20' }]}>
+              <ModernIcon name={item.icon} size="md" color={item.color} />
+            </View>
+            <View style={styles.menuItemContent}>
+              <Text style={styles.menuItemTitle}>{item.title}</Text>
+              <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+            </View>
+            <ModernIcon name="arrow-right" size="sm" color={modernTheme.colors.text.muted} />
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Footer con información del usuario */}
+      {/* Modern Footer */}
       <View style={styles.footer}>
         <View style={styles.userInfo}>
           <Text style={styles.userEmail}>{userEmail}</Text>
-          <Text style={styles.userStatus}>
-            {isEmailVerified ? '✅ Email verificado' : '❌ Email sin verificar'}
-          </Text>
+          <View style={styles.statusContainer}>
+            <StatusIcon 
+              status={isEmailVerified ? 'approved' : 'pending'} 
+              size="xs"
+            />
+            <Text style={[
+              styles.userStatus,
+              { color: isEmailVerified ? modernTheme.colors.success : modernTheme.colors.warning }
+            ]}>
+              {isEmailVerified ? 'Email verificado' : 'Email sin verificar'}
+            </Text>
+          </View>
         </View>
         
-        <TouchableOpacity 
-          style={styles.signOutButton}
+        <IconButton
+          icon="back"
+          text="Cerrar Sesión"
+          variant="outline"
           onPress={handleSignOut}
           disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Text style={styles.signOutButtonText}>Cerrar Sesión</Text>
-          )}
-        </TouchableOpacity>
+          iconPosition="left"
+          style={styles.signOutButton}
+        />
       </View>
     </ScrollView>
   );
@@ -335,58 +374,89 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: modernTheme.colors.background.primary,
   },
+  contentContainer: {
+    paddingBottom: modernTheme.spacing.xxl,
+  },
+  
+  // Header styles
   header: {
-    backgroundColor: '#3498db',
-    padding: 20,
+    backgroundColor: modernTheme.colors.primary,
+    paddingTop: modernTheme.spacing.xl + modernTheme.spacing.md,
+    paddingBottom: modernTheme.spacing.xl,
+  },
+  headerContent: {
+    paddingHorizontal: modernTheme.spacing.lg,
+  },
+  welcomeSection: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: modernTheme.spacing.md,
+  },
+  welcomeEmoji: {
+    fontSize: 32,
+    marginRight: modernTheme.spacing.md,
+  },
+  welcomeTextContainer: {
+    flex: 1,
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 5,
+    ...modernTheme.typography.h2,
+    color: modernTheme.colors.text.inverse,
+    marginBottom: modernTheme.spacing.xs,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#ecf0f1',
-    marginBottom: 5,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.inverse + '90',
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: modernTheme.colors.surface.primary + '20',
+    paddingHorizontal: modernTheme.spacing.md,
+    paddingVertical: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.lg,
+    alignSelf: 'flex-start',
+    marginBottom: modernTheme.spacing.sm,
+  },
+  roleIcon: {
+    marginRight: modernTheme.spacing.sm,
   },
   roleText: {
-    fontSize: 14,
-    color: '#bdc3c7',
-    marginBottom: 5,
-  },
-  warningContainer: {
-    backgroundColor: '#f39c12',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-    marginTop: 5,
-  },
-  warningText: {
-    color: '#ffffff',
-    fontSize: 12,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.inverse,
     fontWeight: '600',
   },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: modernTheme.colors.warning + '20',
+    paddingHorizontal: modernTheme.spacing.md,
+    paddingVertical: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.lg,
+    alignSelf: 'flex-start',
+  },
+  warningText: {
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.inverse,
+    fontWeight: '500',
+    marginLeft: modernTheme.spacing.sm,
+  },
+  
+  // Stats styles
   statsContainer: {
-    backgroundColor: '#ffffff',
-    margin: 15,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: modernTheme.colors.surface.primary,
+    margin: modernTheme.spacing.lg,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.lg,
+    ...modernTheme.shadows.medium,
   },
   statsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 15,
+    ...modernTheme.typography.h4,
     textAlign: 'center',
+    marginBottom: modernTheme.spacing.lg,
+    color: modernTheme.colors.text.primary,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -394,149 +464,146 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   statCard: {
-    width: '48%',
-    padding: 15,
-    borderRadius: 10,
+    width: '30%',
+    backgroundColor: modernTheme.colors.surface.secondary,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.md,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: modernTheme.spacing.md,
+    borderLeftWidth: 4,
+  },
+  statIcon: {
+    marginBottom: modernTheme.spacing.md,
   },
   statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    ...modernTheme.typography.h3,
+    color: modernTheme.colors.text.primary,
+    marginBottom: modernTheme.spacing.xs,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#ffffff',
-    marginTop: 5,
+    ...modernTheme.typography.caption,
+    color: modernTheme.colors.text.secondary,
     textAlign: 'center',
   },
+  
+  // Section styles
   sectionContainer: {
-    backgroundColor: '#ffffff',
-    margin: 15,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: modernTheme.colors.surface.primary,
+    margin: modernTheme.spacing.lg,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.lg,
+    ...modernTheme.shadows.small,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 15,
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.primary,
+    marginBottom: modernTheme.spacing.lg,
   },
   serviceCard: {
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#3498db',
+    backgroundColor: modernTheme.colors.background.secondary,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.md,
+    marginBottom: modernTheme.spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: modernTheme.colors.primary,
   },
-  serviceName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 5,
-  },
-  serviceDescription: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 5,
-  },
-  servicePrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#27ae60',
-  },
-  menuContainer: {
-    backgroundColor: '#ffffff',
-    margin: 15,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  menuTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  menuButton: {
+  serviceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+    marginBottom: modernTheme.spacing.sm,
   },
-  menuButtonIcon: {
-    fontSize: 24,
-    marginRight: 15,
-  },
-  menuButtonContent: {
+  serviceName: {
+    ...modernTheme.typography.bodyLarge,
+    fontWeight: '600',
+    color: modernTheme.colors.text.primary,
+    marginLeft: modernTheme.spacing.sm,
     flex: 1,
   },
-  menuButtonText: {
-    fontSize: 16,
+  serviceDescription: {
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
+    marginBottom: modernTheme.spacing.sm,
+  },
+  servicePrice: {
+    ...modernTheme.typography.body,
     fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 2,
+    color: modernTheme.colors.success,
   },
-  menuButtonSubtext: {
-    fontSize: 12,
-    color: '#7f8c8d',
+  
+  // Menu styles
+  menuContainer: {
+    backgroundColor: modernTheme.colors.surface.primary,
+    margin: modernTheme.spacing.lg,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.lg,
+    ...modernTheme.shadows.medium,
   },
-  menuButtonArrow: {
-    fontSize: 18,
-    color: '#bdc3c7',
-    fontWeight: 'bold',
+  menuTitle: {
+    ...modernTheme.typography.h4,
+    textAlign: 'center',
+    marginBottom: modernTheme.spacing.lg,
+    color: modernTheme.colors.text.primary,
   },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.md,
+    marginBottom: modernTheme.spacing.md,
+    backgroundColor: modernTheme.colors.background.secondary,
+    borderWidth: 1,
+    borderColor: modernTheme.colors.border.primary,
+  },
+  menuItemIcon: {
+    width: 45,
+    height: 45,
+    borderRadius: modernTheme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: modernTheme.spacing.lg,
+  },
+  menuItemContent: {
+    flex: 1,
+  },
+  menuItemTitle: {
+    ...modernTheme.typography.bodyLarge,
+    fontWeight: '600',
+    color: modernTheme.colors.text.primary,
+    marginBottom: modernTheme.spacing.xs,
+  },
+  menuItemSubtitle: {
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+  },
+  
+  // Footer styles
   footer: {
-    backgroundColor: '#ffffff',
-    margin: 15,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: modernTheme.colors.surface.primary,
+    margin: modernTheme.spacing.lg,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.lg,
+    ...modernTheme.shadows.small,
   },
   userInfo: {
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: modernTheme.spacing.lg,
   },
   userEmail: {
-    fontSize: 14,
-    color: '#2c3e50',
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.primary,
     fontWeight: '500',
-    marginBottom: 5,
+    marginBottom: modernTheme.spacing.sm,
   },
-  userStatus: {
-    fontSize: 12,
-    color: '#7f8c8d',
-  },
-  signOutButton: {
-    backgroundColor: '#e74c3c',
-    padding: 15,
-    borderRadius: 8,
+  statusContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  signOutButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+  userStatus: {
+    ...modernTheme.typography.bodySmall,
+    marginLeft: modernTheme.spacing.sm,
+  },
+  signOutButton: {
+    alignSelf: 'stretch',
   },
 });
 

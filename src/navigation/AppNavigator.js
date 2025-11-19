@@ -1,8 +1,9 @@
 /**
- * Navegador principal para Star Limpiezas Mobile
- * Navegación basada en roles: admin y user
+ * Modernized Navigator for Star Limpiezas Mobile
+ * Role-based navigation with elegant animations
  */
 import React from 'react';
+import { Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,12 +16,13 @@ import AdminUsersScreen from '../screens/AdminUsersScreen';
 import BonificationsScreen from '../screens/BonificationsScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
-import Ionicons from '@react-native-vector-icons/ionicons';
+import SimpleLoadingScreen from '../components/SimpleLoadingScreen';
+import { modernTheme } from '../theme/ModernTheme';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Navegador de pestañas para Admin
+// Modern tab navigator for Admin
 const AdminTabNavigator = () => {
   return (
     <Tab.Navigator
@@ -30,48 +32,46 @@ const AdminTabNavigator = () => {
 
           switch (route.name) {
             case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
+              iconName = focused ? 'home-sharp' : 'home-outline';
               break;
             case 'Servicios':
-              iconName = focused ? 'construct' : 'construct-outline';
+              iconName = focused ? 'sparkles-sharp' : 'sparkles-outline';
               break;
             case 'Clientes':
-              iconName = focused ? 'people' : 'people-outline';
+              iconName = focused ? 'people-sharp' : 'people-outline';
               break;
             default:
               iconName = 'home-outline';
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          // We'll use text-based icons for now and replace with proper icons later
+          return <Text style={{ fontSize: size, color }}>★</Text>;
         },
-        tabBarActiveTintColor: '#3498db',
-        tabBarInactiveTintColor: '#7f8c8d',
+        tabBarActiveTintColor: modernTheme.colors.primary,
+        tabBarInactiveTintColor: modernTheme.colors.text.muted,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopWidth: 1,
-          borderTopColor: '#e0e0e0',
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
+          backgroundColor: modernTheme.colors.surface.primary,
+          borderTopWidth: 0,
+          elevation: 8,
+          shadowColor: modernTheme.colors.text.primary,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          height: 80,
+          paddingTop: 8,
+          paddingBottom: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '500',
+          fontWeight: '600',
         },
-        headerStyle: {
-          backgroundColor: '#3498db',
-        },
-        headerTintColor: '#ffffff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerShown: false, // We don't want headers in tab navigator
       })}
     >
       <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{
-          title: 'Inicio Admin',
           tabBarLabel: 'Inicio',
         }}
       />
@@ -79,7 +79,6 @@ const AdminTabNavigator = () => {
         name="Servicios"
         component={ServiciosScreen}
         options={{
-          title: '🧹 Gestión de Servicios',
           tabBarLabel: 'Servicios',
         }}
       />
@@ -87,7 +86,6 @@ const AdminTabNavigator = () => {
         name="Clientes"
         component={ClientesScreen}
         options={{
-          title: '👥 Clientes',
           tabBarLabel: 'Clientes',
         }}
       />
@@ -95,7 +93,7 @@ const AdminTabNavigator = () => {
   );
 };
 
-// Navegador de pestañas para User
+// Modern tab navigator for Users
 const UserTabNavigator = () => {
   return (
     <Tab.Navigator
@@ -105,51 +103,49 @@ const UserTabNavigator = () => {
 
           switch (route.name) {
             case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
+              iconName = focused ? 'home-sharp' : 'home-outline';
               break;
             case 'Servicios':
-              iconName = focused ? 'construct' : 'construct-outline';
+              iconName = focused ? 'sparkles-sharp' : 'sparkles-outline';
               break;
             case 'Perfil':
-              iconName = focused ? 'person' : 'person-outline';
+              iconName = focused ? 'person-sharp' : 'person-outline';
               break;
             case 'Reportes':
-              iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+              iconName = focused ? 'bar-chart-sharp' : 'bar-chart-outline';
               break;
             default:
               iconName = 'home-outline';
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          // We'll use text-based icons for now and replace with proper icons later
+          return <Text style={{ fontSize: size, color }}>★</Text>;
         },
-        tabBarActiveTintColor: '#3498db',
-        tabBarInactiveTintColor: '#7f8c8d',
+        tabBarActiveTintColor: modernTheme.colors.primary,
+        tabBarInactiveTintColor: modernTheme.colors.text.muted,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopWidth: 1,
-          borderTopColor: '#e0e0e0',
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
+          backgroundColor: modernTheme.colors.surface.primary,
+          borderTopWidth: 0,
+          elevation: 8,
+          shadowColor: modernTheme.colors.text.primary,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          height: 80,
+          paddingTop: 8,
+          paddingBottom: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '500',
+          fontWeight: '600',
         },
-        headerStyle: {
-          backgroundColor: '#3498db',
-        },
-        headerTintColor: '#ffffff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerShown: false, // We don't want headers in tab navigator
       })}
     >
       <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{
-          title: 'Inicio Usuario',
           tabBarLabel: 'Inicio',
         }}
       />
@@ -157,7 +153,6 @@ const UserTabNavigator = () => {
         name="Servicios"
         component={ServiciosScreen}
         options={{
-          title: '🧹 Mis Servicios',
           tabBarLabel: 'Servicios',
         }}
       />
@@ -165,7 +160,6 @@ const UserTabNavigator = () => {
         name="Reportes"
         component={ReportsScreen}
         options={{
-          title: '📊 Mis Reportes',
           tabBarLabel: 'Reportes',
         }}
       />
@@ -173,7 +167,6 @@ const UserTabNavigator = () => {
         name="Perfil"
         component={UserProfileScreen}
         options={{
-          title: '👤 Mi Perfil',
           tabBarLabel: 'Perfil',
         }}
       />
@@ -181,47 +174,65 @@ const UserTabNavigator = () => {
   );
 };
 
-// Navegador principal de la aplicación
+// Main app navigator with modern animations
 const AppNavigator = () => {
   const { isAuthenticated, loading, initializing, isAdmin, isUser } = useAuth();
 
-  // Mostrar loading durante la inicialización
+  // Show loading during initialization
   if (initializing || loading) {
-    return null; // El contexto manejará la pantalla de loading
+    return <SimpleLoadingScreen message="Iniciando aplicación..." />;
+    return null; // Auth context will handle loading screen
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      screenOptions={{
+        headerShown: false,
+        gestureEnabled: true,
+        cardStyleInterpolator: ({ current, layouts }) => {
+          return {
+            cardStyle: {
+              transform: [
+                {
+                  translateY: current.progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [layouts.screen.height, 0],
+                  }),
+                },
+              ],
+              opacity: current.progress.interpolate({
+                inputRange: [0, 0.5, 1],
+                outputRange: [0, 1, 1],
+              }),
+            },
+          };
+        },
+      }}
+    >
       <Stack.Navigator
         screenOptions={{
-          headerStyle: {
-            backgroundColor: '#3498db',
-          },
-          headerTintColor: '#ffffff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
+          headerShown: false,
+          cardStyle: { backgroundColor: modernTheme.colors.background.primary },
+          gestureEnabled: true,
         }}
       >
         {!isAuthenticated ? (
-          // Stack de autenticación
+          // Authentication stack
           <Stack.Screen
             name="Auth"
             component={LoginScreen}
             options={{
-              headerShown: false,
               title: 'Star Limpiezas',
             }}
           />
         ) : (
-          // Stack principal basado en rol
+          // Main stack based on role
           <>
             {isAdmin() && (
               <Stack.Screen
                 name="AdminMain"
                 component={AdminTabNavigator}
                 options={{
-                  headerShown: false,
                   title: 'Star Limpiezas - Admin',
                 }}
               />
@@ -231,31 +242,30 @@ const AppNavigator = () => {
                 name="UserMain"
                 component={UserTabNavigator}
                 options={{
-                  headerShown: false,
                   title: 'Star Limpiezas - Usuario',
                 }}
               />
             )}
-            {/* Pantallas adicionales accesibles desde el stack */}
+            {/* Additional screens accessible from main stack */}
             <Stack.Screen
               name="AdminUsers"
               component={AdminUsersScreen}
               options={{
-                title: '👥 Administración de Usuarios',
+                title: 'Gestión de Usuarios',
               }}
             />
             <Stack.Screen
               name="Bonifications"
               component={BonificationsScreen}
               options={{
-                title: '🎁 Gestión de Bonificaciones',
+                title: 'Gestión de Bonificaciones',
               }}
             />
             <Stack.Screen
               name="Reports"
               component={ReportsScreen}
               options={{
-                title: '📊 Reportes',
+                title: 'Reportes',
               }}
             />
           </>

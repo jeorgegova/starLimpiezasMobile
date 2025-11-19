@@ -1,5 +1,6 @@
 /**
- * Pantalla de Login/Registro para Star Limpiezas Mobile
+ * Modernized Login/Registration Screen for Star Limpiezas Mobile
+ * Enhanced with bubble animations, responsive design, and optimized spacing
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -13,9 +14,58 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Modal
+  Modal,
+  Animated,
+  Dimensions,
+  useWindowDimensions
 } from 'react-native';
 import { useAuth } from '../services/AuthContext';
+import { modernTheme } from '../theme/ModernTheme';
+import ModernIcon, { IconButton, StatusIcon } from '../theme/ModernIcon';
+
+const BubbleBackground = () => {
+  const bubbles = Array.from({ length: 6 }).map((_, i) => {
+    const animValue = new Animated.Value(0);
+    
+    useEffect(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(animValue, {
+            toValue: 1,
+            duration: 4000 + i * 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }, []);
+
+    return (
+      <Animated.View
+        key={i}
+        style={[
+          styles.bubble,
+          {
+            left: `${15 + i * 12}%`,
+            opacity: animValue.interpolate({
+              inputRange: [0, 0.2, 1],
+              outputRange: [0, 0.3, 0],
+            }),
+            transform: [
+              {
+                translateY: animValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -600],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+    );
+  });
+
+  return <View style={styles.bubbleContainer}>{bubbles}</View>;
+};
 
 const LoginScreen = () => {
   const { 
@@ -26,6 +76,10 @@ const LoginScreen = () => {
     signUp, 
     resetPassword,
   } = useAuth();
+
+  const { height, width } = useWindowDimensions();
+  const isSmallScreen = height < 700;
+  const isTablet = width >= 768;
   
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -38,7 +92,34 @@ const LoginScreen = () => {
     name: ''
   });
 
-  // Limpiar errores cuando cambian los campos
+  // Animation values
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(50));
+  const [logoAnim] = useState(new Animated.Value(0.5));
+
+  useEffect(() => {
+    // Animate form elements on mount
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: modernTheme.animations.timing.normal,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: modernTheme.animations.timing.normal,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoAnim, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  // Clear errors when form fields change
   useEffect(() => {
     if (Object.keys(errors).length > 0) {
       const timer = setTimeout(() => {
@@ -54,7 +135,6 @@ const LoginScreen = () => {
       [field]: value
     }));
     
-    // Limpiar error específico del campo
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -71,21 +151,18 @@ const LoginScreen = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Validar email
     if (!formData.email) {
       newErrors.email = 'El email es requerido';
     } else if (!validateEmail(formData.email)) {
       newErrors.email = 'Formato de email inválido';
     }
 
-    // Validar contraseña
     if (!formData.password) {
       newErrors.password = 'La contraseña es requerida';
     } else if (formData.password.length < 6) {
       newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
     }
 
-    // Validaciones adicionales para registro
     if (!isLoginMode) {
       if (!formData.name.trim()) {
         newErrors.name = 'El nombre es requerido';
@@ -109,7 +186,7 @@ const LoginScreen = () => {
       if (isLoginMode) {
         const result = await signIn(formData.email, formData.password);
         if (result.success) {
-          // El usuario será navegado automáticamente por el sistema de navegación
+          // User will be navigated automatically by navigation system
         }
       } else {
         const result = await signUp(
@@ -118,7 +195,6 @@ const LoginScreen = () => {
           { name: formData.name.trim() }
         );
         if (result.success) {
-          // Cambiar a modo login después del registro exitoso
           setTimeout(() => {
             setIsLoginMode(true);
             setFormData({
@@ -158,108 +234,186 @@ const LoginScreen = () => {
     ];
   };
 
-  // Loading inicial
+  const responsiveSpacing = {
+    contentPadding: isTablet ? modernTheme.spacing.xxl : modernTheme.spacing.xl,
+    logoSize: isTablet ? 100 : 80,
+    logoBgSize: isTablet ? 120 : 80,
+    titleSize: isTablet ? 32 : 28,
+    scrollPadding: isTablet ? modernTheme.spacing.xl : modernTheme.spacing.lg,
+  };
+
   if (initializing) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3498db" />
+        <ActivityIndicator size="large" color={modernTheme.colors.primary} />
         <Text style={styles.loadingText}>Cargando...</Text>
       </View>
     );
   }
 
-  // Pantalla principal de login/registro
   return (
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <BubbleBackground />
+      
       <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
+        contentContainerStyle={[
+          styles.scrollContainer,
+          { paddingHorizontal: responsiveSpacing.scrollPadding }
+        ]}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.content}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.logoEmoji}>🧹</Text>
-            <Text style={styles.title}>Star Limpiezas Mobile</Text>
+        <Animated.View 
+          style={[
+            styles.content,
+            { padding: responsiveSpacing.contentPadding },
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <View style={styles.logoSection}>
+            <Animated.View 
+              style={[
+                { transform: [{ scale: logoAnim }] }
+              ]}
+            >
+              <View style={[
+                styles.logoBackground,
+                { 
+                  width: responsiveSpacing.logoBgSize,
+                  height: responsiveSpacing.logoBgSize,
+                  borderRadius: responsiveSpacing.logoBgSize / 2,
+                }
+              ]}>
+                <ModernIcon 
+                  name="cleaning" 
+                  size={responsiveSpacing.logoSize > 100 ? "xxl" : "xl"}
+                  color={modernTheme.colors.primary}
+                />
+              </View>
+            </Animated.View>
+            <Text style={[
+              styles.title,
+              { fontSize: responsiveSpacing.titleSize }
+            ]}>
+              Star Limpiezas
+            </Text>
             <Text style={styles.subtitle}>
               {isLoginMode ? 'Inicia sesión en tu cuenta' : 'Crea tu cuenta nueva'}
             </Text>
           </View>
 
           {!isLoginMode && (
-            <TextInput
-              style={getFieldStyle('name')}
-              placeholder="Nombre completo *"
-              value={formData.name}
-              onChangeText={(value) => handleInputChange('name', value)}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Nombre completo</Text>
+              <TextInput
+                style={getFieldStyle('name')}
+                placeholder="Tu nombre completo"
+                value={formData.name}
+                onChangeText={(value) => handleInputChange('name', value)}
+                autoCapitalize="words"
+                autoCorrect={false}
+                placeholderTextColor={modernTheme.colors.text.muted}
+              />
+              {errors.name && (
+                <View style={styles.errorContainer}>
+                  <ModernIcon name="error" size="xs" color={modernTheme.colors.error} />
+                  <Text style={styles.errorText}>{errors.name}</Text>
+                </View>
+              )}
+            </View>
           )}
-          {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
 
-          <TextInput
-            style={getFieldStyle('email')}
-            placeholder="Correo electrónico *"
-            value={formData.email}
-            onChangeText={(value) => handleInputChange('email', value)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Correo electrónico</Text>
+            <TextInput
+              style={getFieldStyle('email')}
+              placeholder="tu@email.com"
+              value={formData.email}
+              onChangeText={(value) => handleInputChange('email', value)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholderTextColor={modernTheme.colors.text.muted}
+            />
+            {errors.email && (
+              <View style={styles.errorContainer}>
+                <ModernIcon name="error" size="xs" color={modernTheme.colors.error} />
+                <Text style={styles.errorText}>{errors.email}</Text>
+              </View>
+            )}
+          </View>
 
-          <TextInput
-            style={getFieldStyle('password')}
-            placeholder="Contraseña *"
-            value={formData.password}
-            onChangeText={(value) => handleInputChange('password', value)}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-          {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Contraseña</Text>
+            <TextInput
+              style={getFieldStyle('password')}
+              placeholder="Tu contraseña"
+              value={formData.password}
+              onChangeText={(value) => handleInputChange('password', value)}
+              secureTextEntry
+              autoCapitalize="none"
+              placeholderTextColor={modernTheme.colors.text.muted}
+            />
+            {errors.password && (
+              <View style={styles.errorContainer}>
+                <ModernIcon name="error" size="xs" color={modernTheme.colors.error} />
+                <Text style={styles.errorText}>{errors.password}</Text>
+              </View>
+            )}
+          </View>
 
           {!isLoginMode && (
-            <>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Confirmar contraseña</Text>
               <TextInput
                 style={getFieldStyle('confirmPassword')}
-                placeholder="Confirmar contraseña *"
+                placeholder="Repite tu contraseña"
                 value={formData.confirmPassword}
                 onChangeText={(value) => handleInputChange('confirmPassword', value)}
                 secureTextEntry
                 autoCapitalize="none"
+                placeholderTextColor={modernTheme.colors.text.muted}
               />
-              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-            </>
+              {errors.confirmPassword && (
+                <View style={styles.errorContainer}>
+                  <ModernIcon name="error" size="xs" color={modernTheme.colors.error} />
+                  <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                </View>
+              )}
+            </View>
           )}
 
-          <TouchableOpacity 
-            style={[styles.button, styles.primaryButton]}
+          <IconButton
+            icon={loading ? undefined : 'check'}
+            text={loading ? 'Procesando...' : (isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta')}
+            variant="primary"
+            size="lg"
             onPress={handleSubmit}
             disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Text style={styles.buttonText}>
-                {isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta'}
-              </Text>
-            )}
-          </TouchableOpacity>
+            loading={loading}
+            style={styles.submitButton}
+          />
 
           {isLoginMode && (
             <TouchableOpacity 
               style={styles.forgotPasswordButton}
               onPress={() => setShowForgotPassword(true)}
               disabled={loading}
+              activeOpacity={0.7}
             >
+              <ModernIcon name="question" size="sm" color={modernTheme.colors.primary} />
               <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity 
-            style={[styles.button, styles.secondaryButton]}
+            style={styles.toggleModeButton}
             onPress={() => {
               setIsLoginMode(!isLoginMode);
               setFormData({
@@ -271,8 +425,9 @@ const LoginScreen = () => {
               setErrors({});
             }}
             disabled={loading}
+            activeOpacity={0.7}
           >
-            <Text style={styles.secondaryButtonText}>
+            <Text style={styles.toggleModeText}>
               {isLoginMode 
                 ? '¿No tienes cuenta? Regístrate' 
                 : '¿Ya tienes cuenta? Inicia sesión'
@@ -282,15 +437,15 @@ const LoginScreen = () => {
 
           {!isLoginMode && (
             <View style={styles.infoContainer}>
+              <ModernIcon name="info" size="xs" color={modernTheme.colors.text.muted} />
               <Text style={styles.infoText}>
-                Al registrarte, aceptarás nuestros términos de servicio y política de privacidad.
+                Al registrarte, aceptas nuestros términos de servicio y política de privacidad.
               </Text>
             </View>
           )}
-        </View>
+        </Animated.View>
       </ScrollView>
 
-      {/* Modal de recuperación de contraseña */}
       <Modal
         visible={showForgotPassword}
         transparent={true}
@@ -298,42 +453,59 @@ const LoginScreen = () => {
         onRequestClose={() => setShowForgotPassword(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Recuperar Contraseña</Text>
+          <Animated.View 
+            style={[
+              styles.modalContent,
+              {
+                transform: [
+                  { 
+                    scale: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 0.9]
+                    })
+                  }
+                ]
+              }
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <ModernIcon name="lock" size="lg" color={modernTheme.colors.primary} />
+              <Text style={styles.modalTitle}>Recuperar Contraseña</Text>
+            </View>
             <Text style={styles.modalSubtitle}>
               Ingresa tu email para recibir un enlace de recuperación
             </Text>
             
             <TextInput
               style={styles.modalInput}
-              placeholder="Correo electrónico"
+              placeholder="tu@email.com"
               value={resetEmail}
               onChangeText={setResetEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              placeholderTextColor={modernTheme.colors.text.muted}
             />
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
+              <IconButton
+                text="Cancelar"
+                variant="outline"
+                size="md"
                 onPress={() => setShowForgotPassword(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
+                style={styles.modalButton}
+              />
               
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.sendButton]}
+              <IconButton
+                text="Enviar"
+                variant="primary"
+                size="md"
                 onPress={handleForgotPassword}
                 disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.sendButtonText}>Enviar</Text>
-                )}
-              </TouchableOpacity>
+                loading={loading}
+                style={styles.modalButton}
+              />
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </KeyboardAvoidingView>
@@ -343,180 +515,184 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: modernTheme.colors.background.primary,
+    overflow: 'hidden',
   },
+  
+  bubbleContainer: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.6,
+    pointerEvents: 'none',
+  },
+  bubble: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: modernTheme.colors.primary + '15',
+    bottom: -100,
+  },
+  
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: modernTheme.colors.background.primary,
   },
   loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: '#7f8c8d',
+    marginTop: modernTheme.spacing.md,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
   },
+  
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: modernTheme.spacing.lg,
+    minHeight: '100%',
   },
   content: {
-    padding: 20,
-    backgroundColor: '#ffffff',
-    margin: 20,
-    borderRadius: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    backgroundColor: modernTheme.colors.surface.primary,
+    borderRadius: modernTheme.borderRadius.xl,
+    ...modernTheme.shadows.large,
   },
-  logoContainer: {
+  
+  // Logo section
+  logoSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: modernTheme.spacing.lg,
   },
-  logoEmoji: {
-    fontSize: 60,
-    marginBottom: 10,
+  logoBackground: {
+    backgroundColor: modernTheme.colors.primary + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: modernTheme.spacing.lg,
+    ...modernTheme.shadows.medium,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    ...modernTheme.typography.h1,
+    color: modernTheme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: 5,
+    marginBottom: modernTheme.spacing.xs,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#7f8c8d',
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
     textAlign: 'center',
+  },
+  
+  // Input styles
+  inputGroup: {
+    marginBottom: modernTheme.spacing.md,
+  },
+  inputLabel: {
+    ...modernTheme.typography.label,
+    color: modernTheme.colors.text.primary,
+    marginBottom: modernTheme.spacing.xs,
   },
   input: {
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
+    ...modernTheme.componentStyles.input,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
   },
   inputError: {
-    borderColor: '#e74c3c',
-    backgroundColor: '#fdf2f2',
+    ...modernTheme.componentStyles.inputError,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: modernTheme.spacing.xs,
   },
   errorText: {
-    color: '#e74c3c',
-    fontSize: 12,
-    marginBottom: 10,
-    marginLeft: 5,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.error,
+    marginLeft: modernTheme.spacing.sm,
   },
-  button: {
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  primaryButton: {
-    backgroundColor: '#3498db',
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#3498db',
+  
+  // Button styles
+  submitButton: {
+    marginTop: modernTheme.spacing.md,
+    marginBottom: modernTheme.spacing.sm,
   },
   forgotPasswordButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    justifyContent: 'center',
+    paddingVertical: modernTheme.spacing.sm,
+    marginBottom: modernTheme.spacing.md,
   },
   forgotPasswordText: {
-    color: '#3498db',
-    fontSize: 14,
-    textDecorationLine: 'underline',
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.primary,
+    marginLeft: modernTheme.spacing.sm,
   },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+  toggleModeButton: {
+    alignItems: 'center',
+    paddingVertical: modernTheme.spacing.md,
   },
-  secondaryButtonText: {
-    color: '#3498db',
-    fontSize: 14,
+  toggleModeText: {
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
   },
+  
+  // Info styles
   infoContainer: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#ecf0f1',
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: modernTheme.spacing.md,
+    backgroundColor: modernTheme.colors.background.secondary,
+    borderRadius: modernTheme.borderRadius.md,
+    marginTop: modernTheme.spacing.md,
   },
   infoText: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    textAlign: 'center',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginLeft: modernTheme.spacing.sm,
+    flex: 1,
   },
+  
+  // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: modernTheme.colors.text.primary + '80',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: modernTheme.spacing.lg,
   },
   modalContent: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    margin: 20,
-    borderRadius: 15,
-    width: '90%',
+    backgroundColor: modernTheme.colors.surface.primary,
+    padding: modernTheme.spacing.xl,
+    borderRadius: modernTheme.borderRadius.lg,
+    width: '100%',
     maxWidth: 400,
+    ...modernTheme.shadows.xlarge,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: modernTheme.spacing.md,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    ...modernTheme.typography.h3,
+    color: modernTheme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: 10,
+    marginTop: modernTheme.spacing.sm,
   },
   modalSubtitle: {
-    fontSize: 14,
-    color: '#7f8c8d',
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: modernTheme.spacing.lg,
   },
   modalInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 20,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    ...modernTheme.componentStyles.input,
+    marginBottom: modernTheme.spacing.lg,
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    gap: modernTheme.spacing.md,
   },
   modalButton: {
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#95a5a6',
-  },
-  sendButton: {
-    backgroundColor: '#3498db',
-  },
-  cancelButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sendButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+    flex: 1,
   },
 });
 
