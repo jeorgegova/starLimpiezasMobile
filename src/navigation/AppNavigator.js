@@ -188,25 +188,7 @@ const AppNavigator = () => {
     <NavigationContainer
       screenOptions={{
         headerShown: false,
-        gestureEnabled: true,
-        cardStyleInterpolator: ({ current, layouts }) => {
-          return {
-            cardStyle: {
-              transform: [
-                {
-                  translateY: current.progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [layouts.screen.height, 0],
-                  }),
-                },
-              ],
-              opacity: current.progress.interpolate({
-                inputRange: [0, 0.5, 1],
-                outputRange: [0, 1, 1],
-              }),
-            },
-          };
-        },
+        gestureEnabled: false,
       }}
     >
       <Stack.Navigator

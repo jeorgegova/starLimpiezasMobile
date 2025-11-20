@@ -2,7 +2,7 @@
  * Modernized Login/Registration Screen for Star Limpiezas Mobile
  * Enhanced with bubble animations, responsive design, and optimized spacing
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,20 +23,40 @@ import { useAuth } from '../services/AuthContext';
 import { modernTheme } from '../theme/ModernTheme';
 import ModernIcon, { IconButton, StatusIcon } from '../theme/ModernIcon';
 
+const bubbleArray = [
+  { size: 70, left: "12%", delay: 0, dur: 8000, topFrom: 92, topTo: -16, opacity: 0.26 },
+  { size: 100, left: "26%", delay: 2000, dur: 10000, topFrom: 96, topTo: -9, opacity: 0.19 },
+  { size: 60, left: "53%", delay: 1000, dur: 9000, topFrom: 88, topTo: -13, opacity: 0.23 },
+  { size: 120, left: "77%", delay: 3000, dur: 12000, topFrom: 90, topTo: -18, opacity: 0.22 },
+  { size: 48, left: "36%", delay: 4000, dur: 7000, topFrom: 84, topTo: -10, opacity: 0.20 },
+  { size: 85, left: "71%", delay: 500, dur: 11000, topFrom: 81, topTo: -10, opacity: 0.17 },
+];
+
 const BubbleBackground = () => {
-  const bubbles = Array.from({ length: 6 }).map((_, i) => {
-    const animValue = new Animated.Value(0);
-    
+  const bubbles = bubbleArray.map((b, i) => {
+    const animValue = useRef(new Animated.Value(0)).current;
+
     useEffect(() => {
-      Animated.loop(
-        Animated.sequence([
+      const startAnimation = () => {
+        const animate = () => {
           Animated.timing(animValue, {
             toValue: 1,
-            duration: 4000 + i * 1000,
+            duration: b.dur,
             useNativeDriver: true,
-          }),
-        ])
-      ).start();
+          }).start(() => {
+            // Reset animation value and start again
+            animValue.setValue(0);
+            animate();
+          });
+        };
+
+        // Start with delay
+        setTimeout(() => {
+          animate();
+        }, b.delay);
+      };
+
+      startAnimation();
     }, []);
 
     return (
@@ -45,16 +65,18 @@ const BubbleBackground = () => {
         style={[
           styles.bubble,
           {
-            left: `${15 + i * 12}%`,
+            width: b.size,
+            height: b.size,
+            left: b.left,
             opacity: animValue.interpolate({
-              inputRange: [0, 0.2, 1],
-              outputRange: [0, 0.3, 0],
+              inputRange: [0, 0.5, 1],
+              outputRange: [b.opacity, b.opacity * 0.3, b.opacity],
             }),
             transform: [
               {
                 translateY: animValue.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -600],
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [`${b.topFrom}%`, `${b.topTo}%`, `${b.topFrom}%`],
                 }),
               },
             ],
@@ -92,31 +114,15 @@ const LoginScreen = () => {
     name: ''
   });
 
-  // Animation values
+  // Simple fade animation
   const [fadeAnim] = useState(new Animated.Value(0));
-  const [slideAnim] = useState(new Animated.Value(50));
-  const [logoAnim] = useState(new Animated.Value(0.5));
 
   useEffect(() => {
-    // Animate form elements on mount
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: modernTheme.animations.timing.normal,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: modernTheme.animations.timing.normal,
-        useNativeDriver: true,
-      }),
-      Animated.spring(logoAnim, {
-        toValue: 1,
-        tension: 100,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: modernTheme.animations.timing.normal,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   // Clear errors when form fields change
@@ -252,13 +258,12 @@ const LoginScreen = () => {
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <BubbleBackground />
-      
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={[
           styles.scrollContainer,
           { paddingHorizontal: responsiveSpacing.scrollPadding }
@@ -266,37 +271,30 @@ const LoginScreen = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View 
+        <Animated.View
           style={[
             styles.content,
             { padding: responsiveSpacing.contentPadding },
             {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
+              opacity: fadeAnim
             }
           ]}
         >
           <View style={styles.logoSection}>
-            <Animated.View 
-              style={[
-                { transform: [{ scale: logoAnim }] }
-              ]}
-            >
-              <View style={[
-                styles.logoBackground,
-                { 
-                  width: responsiveSpacing.logoBgSize,
-                  height: responsiveSpacing.logoBgSize,
-                  borderRadius: responsiveSpacing.logoBgSize / 2,
-                }
-              ]}>
-                <ModernIcon 
-                  name="cleaning" 
-                  size={responsiveSpacing.logoSize > 100 ? "xxl" : "xl"}
-                  color={modernTheme.colors.primary}
-                />
-              </View>
-            </Animated.View>
+            <View style={[
+              styles.logoBackground,
+              {
+                width: responsiveSpacing.logoBgSize,
+                height: responsiveSpacing.logoBgSize,
+                borderRadius: responsiveSpacing.logoBgSize / 2,
+              }
+            ]}>
+              <ModernIcon
+                name="cleaning"
+                size={responsiveSpacing.logoSize > 100 ? "xxl" : "xl"}
+                color={modernTheme.colors.primary}
+              />
+            </View>
             <Text style={[
               styles.title,
               { fontSize: responsiveSpacing.titleSize }
@@ -453,21 +451,7 @@ const LoginScreen = () => {
         onRequestClose={() => setShowForgotPassword(false)}
       >
         <View style={styles.modalOverlay}>
-          <Animated.View 
-            style={[
-              styles.modalContent,
-              {
-                transform: [
-                  { 
-                    scale: slideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 0.9]
-                    })
-                  }
-                ]
-              }
-            ]}
-          >
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <ModernIcon name="lock" size="lg" color={modernTheme.colors.primary} />
               <Text style={styles.modalTitle}>Recuperar Contraseña</Text>
@@ -505,7 +489,7 @@ const LoginScreen = () => {
                 style={styles.modalButton}
               />
             </View>
-          </Animated.View>
+          </View>
         </View>
       </Modal>
     </KeyboardAvoidingView>
@@ -516,33 +500,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: modernTheme.colors.background.primary,
-    overflow: 'hidden',
   },
-  
+
   bubbleContainer: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.6,
     pointerEvents: 'none',
+    zIndex: 0,
   },
   bubble: {
     position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: modernTheme.colors.primary + '15',
-    bottom: -100,
+    backgroundColor: 'rgba(187, 238, 249, 0.6)',
+    borderRadius: 50,
+    shadowColor: '#93d4ff',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 32,
+    elevation: 8,
   },
   
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: modernTheme.colors.background.primary,
+    backgroundColor: modernTheme.colors.background.dark,
   },
   loadingText: {
     marginTop: modernTheme.spacing.md,
     ...modernTheme.typography.body,
-    color: modernTheme.colors.text.secondary,
+    color: modernTheme.colors.text.inverse,
   },
   
   scrollContainer: {
@@ -552,9 +537,11 @@ const styles = StyleSheet.create({
     minHeight: '100%',
   },
   content: {
-    backgroundColor: modernTheme.colors.surface.primary,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: modernTheme.borderRadius.xl,
     ...modernTheme.shadows.large,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   
   // Logo section

@@ -3,18 +3,19 @@
  * Elegant design with smooth animations and modern icons
  */
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Alert, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ScrollView,
   ActivityIndicator,
   RefreshControl,
-  Animated
+  Animated,
+  BackHandler
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
 import { serviceService, utilityService } from '../services';
 import { modernTheme } from '../theme/ModernTheme';
@@ -50,6 +51,20 @@ const HomeScreen = () => {
       useNativeDriver: true,
     }).start();
   }, []);
+
+  // Handle back button press on home screen
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        handleSignOut();
+        return true; // Prevent default back action
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => backHandler.remove();
+    }, [])
+  );
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -197,7 +212,9 @@ const HomeScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeEmoji}>✨</Text>
+            <View style={styles.welcomeIconContainer}>
+              <Text style={[styles.welcomeIcon, { color: modernTheme.colors.accent }]}>⭐</Text>
+            </View>
             <View style={styles.welcomeTextContainer}>
               <Text style={styles.welcomeText}>
                 ¡Hola, {userName}!
@@ -394,9 +411,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: modernTheme.spacing.md,
   },
-  welcomeEmoji: {
-    fontSize: 32,
-    marginRight: modernTheme.spacing.md,
+  welcomeIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: modernTheme.borderRadius.xl,
+    backgroundColor: modernTheme.colors.accent + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: modernTheme.spacing.lg,
+    ...modernTheme.shadows.small,
+  },
+  welcomeIcon: {
+    fontSize: 24,
+    textAlign: 'center',
   },
   welcomeTextContainer: {
     flex: 1,

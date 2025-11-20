@@ -16,6 +16,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
 import { userService, utilityService } from '../services';
+import { modernTheme } from '../theme/ModernTheme';
 
 const UserProfileScreen = () => {
   const navigation = useNavigation();
@@ -23,6 +24,7 @@ const UserProfileScreen = () => {
     userName,
     userProfile,
     updateUserProfile,
+    signOut,
     isUser,
     isAdmin
   } = useAuth();
@@ -114,6 +116,23 @@ const UserProfileScreen = () => {
     }));
   };
 
+  const handleLogout = async () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro de que quieres cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar Sesión',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+          }
+        }
+      ]
+    );
+  };
+
   // Verificar permisos antes de renderizar
   if (isAdmin()) {
     return (
@@ -167,7 +186,10 @@ const UserProfileScreen = () => {
         >
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>👤 Mi Perfil</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={[styles.headerIcon, { color: modernTheme.colors.text.inverse }]}>👤</Text>
+          <Text style={styles.headerTitle}>Mi Perfil</Text>
+        </View>
         <Text style={styles.headerSubtitle}>
           Bienvenido, {userName}
         </Text>
@@ -266,6 +288,15 @@ const UserProfileScreen = () => {
             )}
           </TouchableOpacity>
         </View>
+
+        <View style={styles.logoutContainer}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+          >
+            <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -309,11 +340,19 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 50,
   },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  headerIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 5,
   },
   headerSubtitle: {
     fontSize: 14,
@@ -425,6 +464,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   saveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logoutContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  logoutButton: {
+    backgroundColor: '#e74c3c',
+    padding: 15,
+    borderRadius: 8,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',

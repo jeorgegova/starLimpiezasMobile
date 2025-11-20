@@ -9,9 +9,9 @@ const { width, height } = Dimensions.get('window');
 
 // Modern color palette
 export const colors = {
-  primary: '#6366f1', // Modern indigo
-  primaryLight: '#818cf8',
-  primaryDark: '#4f46e5',
+  primary: '#3b82f6', // Modern blue
+  primaryLight: '#60a5fa',
+  primaryDark: '#2563eb',
   
   secondary: '#10b981', // Modern emerald
   secondaryLight: '#34d399',
