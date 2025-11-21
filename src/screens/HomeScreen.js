@@ -19,7 +19,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
 import { serviceService, utilityService } from '../services';
 import { modernTheme } from '../theme/ModernTheme';
-import ModernIcon, { IconButton, StatusIcon } from '../theme/ModernIcon';
+// import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { IconButton, StatusIcon } from '../theme/ModernIcon';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -239,13 +240,13 @@ const HomeScreen = () => {
           )}
           
           {!isEmailVerified && (
-            <View style={styles.warningContainer}>
-              <ModernIcon name="warning" size="sm" color={modernTheme.colors.warning} />
-              <Text style={styles.warningText}>
-                Email no verificado
-              </Text>
-            </View>
-          )}
+          <View style={styles.warningContainer}>
+            <Text style={[styles.warningIcon, { color: modernTheme.colors.warning }]}>⚠️</Text>
+            <Text style={styles.warningText}>
+              Email no verificado
+            </Text>
+          </View>
+        )}
         </View>
       </View>
 
@@ -254,52 +255,37 @@ const HomeScreen = () => {
         <Text style={styles.statsTitle}>Resumen del Dashboard</Text>
         <View style={styles.statsGrid}>
           <View style={[
-            styles.statCard, 
-            { 
+            styles.statCard,
+            {
               backgroundColor: modernTheme.colors.primary + '15',
-              borderLeftColor: modernTheme.colors.primary 
+              borderLeftColor: modernTheme.colors.primary
             }
           ]}>
-            <ModernIcon 
-              name="cleaning" 
-              size="lg" 
-              color={modernTheme.colors.primary}
-              style={styles.statIcon}
-            />
+            <Text style={[styles.statIcon, { color: modernTheme.colors.primary }]}>🧹</Text>
             <Text style={styles.statNumber}>{stats.servicios}</Text>
             <Text style={styles.statLabel}>Servicios</Text>
           </View>
           
           <View style={[
-            styles.statCard, 
-            { 
+            styles.statCard,
+            {
               backgroundColor: modernTheme.colors.secondary + '15',
-              borderLeftColor: modernTheme.colors.secondary 
+              borderLeftColor: modernTheme.colors.secondary
             }
           ]}>
-            <ModernIcon 
-              name="people" 
-              size="lg" 
-              color={modernTheme.colors.secondary}
-              style={styles.statIcon}
-            />
+            <Text style={[styles.statIcon, { color: modernTheme.colors.secondary }]}>👥</Text>
             <Text style={styles.statNumber}>{stats.clientes}</Text>
             <Text style={styles.statLabel}>Clientes</Text>
           </View>
           
           <View style={[
-            styles.statCard, 
-            { 
+            styles.statCard,
+            {
               backgroundColor: modernTheme.colors.accent + '15',
-              borderLeftColor: modernTheme.colors.accent 
+              borderLeftColor: modernTheme.colors.accent
             }
           ]}>
-            <ModernIcon 
-              name="user" 
-              size="lg" 
-              color={modernTheme.colors.accent}
-              style={styles.statIcon}
-            />
+            <Text style={[styles.statIcon, { color: modernTheme.colors.accent }]}>👤</Text>
             <Text style={styles.statNumber}>{stats.usuarios}</Text>
             <Text style={styles.statLabel}>Usuarios</Text>
           </View>
@@ -311,13 +297,13 @@ const HomeScreen = () => {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Servicios Recientes</Text>
           {servicios.map((servicio, index) => (
-            <TouchableOpacity 
-              key={index} 
+            <TouchableOpacity
+              key={index}
               style={styles.serviceCard}
               onPress={() => navigateToScreen('Servicios')}
             >
               <View style={styles.serviceHeader}>
-                <ModernIcon name="cleaning" size="md" color={modernTheme.colors.primary} />
+                <Text style={[styles.serviceIcon, { color: modernTheme.colors.primary }]}>🧹</Text>
                 <Text style={styles.serviceName}>{servicio.nombre || 'Servicio'}</Text>
               </View>
               <Text style={styles.serviceDescription}>
@@ -345,13 +331,15 @@ const HomeScreen = () => {
             activeOpacity={0.8}
           >
             <View style={[styles.menuItemIcon, { backgroundColor: item.color + '20' }]}>
-              <ModernIcon name={item.icon} size="md" color={item.color} />
+              <Text style={[styles.menuItemIconText, { color: item.color }]}>
+                {item.icon === 'cleaning' ? '🧹' : item.icon === 'people' ? '👥' : item.icon === 'employee' ? '👷' : item.icon === 'admin' ? '⚙️' : item.icon === 'bonus' ? '🎁' : item.icon === 'chart' ? '📊' : item.icon === 'person' ? '👤' : '⭐'}
+              </Text>
             </View>
             <View style={styles.menuItemContent}>
               <Text style={styles.menuItemTitle}>{item.title}</Text>
               <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
             </View>
-            <ModernIcon name="arrow-right" size="sm" color={modernTheme.colors.text.muted} />
+            <Text style={[styles.menuItemArrow, { color: modernTheme.colors.text.muted }]}>→</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -464,6 +452,10 @@ const styles = StyleSheet.create({
     borderRadius: modernTheme.borderRadius.lg,
     alignSelf: 'flex-start',
   },
+  warningIcon: {
+    fontSize: 20,
+    textAlign: 'center',
+  },
   warningText: {
     ...modernTheme.typography.bodySmall,
     color: modernTheme.colors.text.inverse,
@@ -500,6 +492,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
   },
   statIcon: {
+    fontSize: 28,
+    textAlign: 'center',
     marginBottom: modernTheme.spacing.md,
   },
   statNumber: {
@@ -538,6 +532,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: modernTheme.spacing.sm,
+  },
+  serviceIcon: {
+    fontSize: 24,
+    marginRight: modernTheme.spacing.sm,
   },
   serviceName: {
     ...modernTheme.typography.bodyLarge,
@@ -589,6 +587,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: modernTheme.spacing.lg,
   },
+  menuItemIconText: {
+    fontSize: 24,
+    textAlign: 'center',
+  },
   menuItemContent: {
     flex: 1,
   },
@@ -601,6 +603,10 @@ const styles = StyleSheet.create({
   menuItemSubtitle: {
     ...modernTheme.typography.bodySmall,
     color: modernTheme.colors.text.secondary,
+  },
+  menuItemArrow: {
+    fontSize: 20,
+    textAlign: 'center',
   },
   
   // Footer styles

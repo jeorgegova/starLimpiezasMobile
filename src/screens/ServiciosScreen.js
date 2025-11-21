@@ -23,7 +23,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
 import { serviceService, utilityService, DATABASE_CONFIG } from '../services';
 import { modernTheme } from '../theme/ModernTheme';
-import ModernIcon, { IconButton, StatusIcon } from '../theme/ModernIcon';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { IconButton, StatusIcon } from '../theme/ModernIcon';
 
 const ServiciosScreen = () => {
   const navigation = useNavigation();
@@ -214,7 +215,7 @@ const ServiciosScreen = () => {
     >
       <View style={styles.servicioHeader}>
         <View style={styles.servicioTitleContainer}>
-          <ModernIcon name="cleaning" size="md" color={modernTheme.colors.primary} />
+          <MaterialIcons name="cleaning-services" size={24} color={modernTheme.colors.primary} />
           <Text style={styles.servicioNombre}>{item.service_name || 'Servicio'}</Text>
         </View>
         <StatusIcon status={item.status} size="sm" />
@@ -222,30 +223,30 @@ const ServiciosScreen = () => {
       
       <View style={styles.servicioInfo}>
         <View style={styles.infoRow}>
-          <ModernIcon name="calendar" size="sm" color={modernTheme.colors.text.secondary} />
+          <MaterialIcons name="calendar-today" size={20} color={modernTheme.colors.text.secondary} />
           <Text style={styles.servicioText}>{formatDate(item.assigned_date)}</Text>
         </View>
         <View style={styles.infoRow}>
-          <ModernIcon name="location" size="sm" color={modernTheme.colors.text.secondary} />
+          <MaterialIcons name="location-on" size={20} color={modernTheme.colors.text.secondary} />
           <Text style={styles.servicioText}>{item.address || 'Sin dirección'}</Text>
         </View>
         <View style={styles.infoRow}>
-          <ModernIcon name="phone" size="sm" color={modernTheme.colors.text.secondary} />
+          <MaterialIcons name="phone" size={20} color={modernTheme.colors.text.secondary} />
           <Text style={styles.servicioText}>{item.phone || 'Sin teléfono'}</Text>
         </View>
         <View style={styles.infoRow}>
-          <ModernIcon name="clock" size="sm" color={modernTheme.colors.text.secondary} />
+          <MaterialIcons name="schedule" size={20} color={modernTheme.colors.text.secondary} />
           <Text style={styles.servicioText}>{getShiftDisplayName(item.shift)}</Text>
         </View>
         {item.hours && (
           <View style={styles.infoRow}>
-            <ModernIcon name="time" size="sm" color={modernTheme.colors.text.secondary} />
+            <MaterialIcons name="schedule" size={20} color={modernTheme.colors.text.secondary} />
             <Text style={styles.servicioText}>{item.hours}</Text>
           </View>
         )}
         {item.location && (
           <View style={styles.infoRow}>
-            <ModernIcon name="pin" size="sm" color={modernTheme.colors.text.secondary} />
+            <MaterialIcons name="location-on" size={20} color={modernTheme.colors.text.secondary} />
             <Text style={styles.servicioText}>{item.location.location}</Text>
           </View>
         )}
@@ -307,7 +308,7 @@ const ServiciosScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.headerTitleSection}>
-            <ModernIcon name="cleaning" size="lg" color={modernTheme.colors.text.inverse} />
+            <MaterialIcons name="cleaning-services" size={28} color={modernTheme.colors.text.inverse} />
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>
                 {isAdmin() ? 'Gestión de Servicios' : 'Mis Servicios'}
@@ -363,9 +364,9 @@ const ServiciosScreen = () => {
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <ModernIcon 
-                  name="cleaning" 
-                  size="xl" 
+                <MaterialIcons
+                  name="cleaning-services"
+                  size={40}
                   color={modernTheme.colors.text.muted}
                   style={styles.emptyIcon}
                 />
@@ -407,7 +408,7 @@ const ServiciosScreen = () => {
             ]}
           >
             <View style={styles.modalHeader}>
-              <ModernIcon name="cleaning" size="lg" color={modernTheme.colors.primary} />
+              <MaterialIcons name="cleaning-services" size={28} color={modernTheme.colors.primary} />
               <Text style={styles.modalTitle}>
                 {editingService ? 'Editar Servicio' : isAdmin() ? 'Crear Servicio' : 'Solicitar Servicio'}
               </Text>
@@ -471,9 +472,9 @@ const ServiciosScreen = () => {
                       ]}
                       onPress={() => setServiceData(prev => ({ ...prev, shift }))}
                     >
-                      <ModernIcon 
-                        name="clock" 
-                        size="sm" 
+                      <MaterialIcons
+                        name="schedule"
+                        size={20}
                         color={serviceData.shift === shift ? modernTheme.colors.primary : modernTheme.colors.text.secondary}
                       />
                       <Text style={[

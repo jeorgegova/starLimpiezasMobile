@@ -205,6 +205,7 @@ const AppNavigator = () => {
             component={LoginScreen}
             options={{
               title: 'Star Limpiezas',
+              cardStyle: { backgroundColor: 'transparent' },
             }}
           />
         ) : (

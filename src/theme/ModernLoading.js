@@ -12,7 +12,8 @@ import {
     TouchableOpacity
 } from 'react-native';
 import { modernTheme } from './ModernTheme';
-import ModernIcon from './ModernIcon';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { iconMap } from './ModernIcon';
 
 export const ModernSpinner = ({
     size = 'large',
@@ -197,7 +198,7 @@ export const ModernPullToRefresh = ({
     return (
         <View style={styles.pullToRefreshContainer}>
             <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                <ModernIcon name="refresh" size={24} color={modernTheme.colors.primary} />
+                <MaterialIcons name="refresh" size={24} color={modernTheme.colors.primary} />
             </Animated.View>
             {refreshing && (
                 <Text style={styles.pullToRefreshText}>
@@ -301,10 +302,10 @@ export const ModernToast = ({
                 }
             ]}
         >
-            <ModernIcon name={config.icon} size={20} color={modernTheme.colors.text.inverse} style={styles.toastIcon} />
+            <MaterialIcons name={iconMap[config.icon] || 'info'} size={20} color={modernTheme.colors.text.inverse} style={styles.toastIcon} />
             <Text style={styles.toastText}>{message}</Text>
             <TouchableOpacity onPress={handleClose}>
-                <ModernIcon name="close" size={20} color={modernTheme.colors.text.inverse} />
+                <MaterialIcons name="close" size={20} color={modernTheme.colors.text.inverse} />
             </TouchableOpacity>
         </Animated.View>
     );
@@ -351,7 +352,7 @@ export const ModernEmptyState = ({
                     { transform: [{ scale: bounce }] }
                 ]}
             >
-                <ModernIcon name={icon} size={64} color={modernTheme.colors.primary} />
+                <MaterialIcons name={iconMap[icon] || 'info'} size={64} color={modernTheme.colors.primary} />
             </Animated.View>
             <Text style={styles.emptyStateTitle}>{title}</Text>
             <Text style={styles.emptyStateSubtitle}>{subtitle}</Text>
