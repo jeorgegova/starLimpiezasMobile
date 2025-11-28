@@ -24,15 +24,15 @@ import { IconButton, StatusIcon } from '../theme/ModernIcon';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
-  const { 
-    user, 
-    signOut, 
-    userName, 
-    userEmail, 
+  const {
+    user,
+    signOut,
+    userName,
+    userEmail,
     isEmailVerified,
-    userRole 
+    userRole
   } = useAuth();
-  
+
   const [servicios, setServicios] = useState([]);
   const [stats, setStats] = useState({
     servicios: 0,
@@ -114,8 +114,8 @@ const HomeScreen = () => {
       '¿Estás seguro de que quieres cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Cerrar Sesión', 
+        {
+          text: 'Cerrar Sesión',
           style: 'destructive',
           onPress: async () => {
             await signOut();
@@ -197,12 +197,12 @@ const HomeScreen = () => {
   ];
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
+        <RefreshControl
+          refreshing={refreshing}
           onRefresh={onRefresh}
           colors={[modernTheme.colors.primary]}
           tintColor={modernTheme.colors.primary}
@@ -225,11 +225,11 @@ const HomeScreen = () => {
               </Text>
             </View>
           </View>
-          
+
           {userRole && (
             <View style={styles.roleContainer}>
-              <StatusIcon 
-                status={userRole === 'admin' ? 'approved' : 'info'} 
+              <StatusIcon
+                status={userRole === 'admin' ? 'approved' : 'info'}
                 size="sm"
                 style={styles.roleIcon}
               />
@@ -238,15 +238,15 @@ const HomeScreen = () => {
               </Text>
             </View>
           )}
-          
+
           {!isEmailVerified && (
-          <View style={styles.warningContainer}>
-            <Text style={[styles.warningIcon, { color: modernTheme.colors.warning }]}>⚠️</Text>
-            <Text style={styles.warningText}>
-              Email no verificado
-            </Text>
-          </View>
-        )}
+            <View style={styles.warningContainer}>
+              <Text style={[styles.warningIcon, { color: modernTheme.colors.warning }]}>⚠️</Text>
+              <Text style={styles.warningText}>
+                Email no verificado
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -265,7 +265,7 @@ const HomeScreen = () => {
             <Text style={styles.statNumber}>{stats.servicios}</Text>
             <Text style={styles.statLabel}>Servicios</Text>
           </View>
-          
+
           <View style={[
             styles.statCard,
             {
@@ -277,7 +277,7 @@ const HomeScreen = () => {
             <Text style={styles.statNumber}>{stats.clientes}</Text>
             <Text style={styles.statLabel}>Clientes</Text>
           </View>
-          
+
           <View style={[
             styles.statCard,
             {
@@ -293,7 +293,7 @@ const HomeScreen = () => {
       </View>
 
       {/* Recent Services */}
-      {servicios.length > 0 && (
+      {servicios.length > 0 && userRole !== 'admin' && (
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Servicios Recientes</Text>
           {servicios.map((servicio, index) => (
@@ -349,8 +349,8 @@ const HomeScreen = () => {
         <View style={styles.userInfo}>
           <Text style={styles.userEmail}>{userEmail}</Text>
           <View style={styles.statusContainer}>
-            <StatusIcon 
-              status={isEmailVerified ? 'approved' : 'pending'} 
+            <StatusIcon
+              status={isEmailVerified ? 'approved' : 'pending'}
               size="xs"
             />
             <Text style={[
@@ -361,7 +361,7 @@ const HomeScreen = () => {
             </Text>
           </View>
         </View>
-        
+
         <IconButton
           icon="back"
           text="Cerrar Sesión"
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingBottom: modernTheme.spacing.xxl,
   },
-  
+
   // Header styles
   header: {
     backgroundColor: modernTheme.colors.primary,
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: modernTheme.spacing.sm,
   },
-  
+
   // Stats styles
   statsContainer: {
     backgroundColor: modernTheme.colors.surface.primary,
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
     color: modernTheme.colors.text.secondary,
     textAlign: 'center',
   },
-  
+
   // Section styles
   sectionContainer: {
     backgroundColor: modernTheme.colors.surface.primary,
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: modernTheme.colors.success,
   },
-  
+
   // Menu styles
   menuContainer: {
     backgroundColor: modernTheme.colors.surface.primary,
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     textAlign: 'center',
   },
-  
+
   // Footer styles
   footer: {
     backgroundColor: modernTheme.colors.surface.primary,
