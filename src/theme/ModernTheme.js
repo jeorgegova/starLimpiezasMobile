@@ -9,63 +9,69 @@ const { width, height } = Dimensions.get('window');
 
 // Modern color palette
 export const colors = {
-  primary: '#3b82f6', // Modern blue
-  primaryLight: '#60a5fa',
-  primaryDark: '#2563eb',
-  
-  secondary: '#10b981', // Modern emerald
-  secondaryLight: '#34d399',
-  secondaryDark: '#059669',
-  
-  accent: '#f59e0b', // Modern amber
-  accentLight: '#fbbf24',
-  accentDark: '#d97706',
-  
-  error: '#ef4444', // Modern red
-  errorLight: '#f87171',
-  errorDark: '#dc2626',
-  
-  warning: '#f59e0b', // Amber
-  warningLight: '#fbbf24',
-  warningDark: '#d97706',
-  
-  success: '#10b981', // Emerald
-  successLight: '#34d399',
-  successDark: '#059669',
-  
-  // Neutral colors
+  // Color principal: gris azulado muy suave y profesional (en vez de azul fuerte)
+  primary: '#4e73a8ff',      // Slate-500 → elegante y neutro
+  primaryLight: '#94a3b8',  // Slate-400
+  primaryDark: '#475569',   // Slate-600
+
+  // Secundario: verde muy suave para éxito
+  secondary: '#86efac',     // Green-300 → fresco pero no chillón
+  secondaryLight: '#bbf7d0',
+  secondaryDark: '#4ade80',
+
+  // Acento: un toque cálido sutil (opcional, para resaltar algo)
+  accent: '#cbd5e1',        // Slate-300 → casi gris, muy sutil
+  accentLight: '#e2e8f0',
+  accentDark: '#94a3b8',
+
+  // Error: rojo suave pero visible
+  error: '#f87171',         // Red-400
+  errorLight: '#fca5a5',
+  errorDark: '#ef4444',
+
+  // Warning: ámbar suave
+  warning: '#fbbf24',
+  warningLight: '#fcd34d',
+  warningDark: '#f59e0b',
+
+  // Success: verde suave
+  success: '#86efac',
+  successLight: '#bbf7d0',
+  successDark: '#4ade80',
+
+  // Fondos: limpios y nítidos (sin tintes que opaquen)
   background: {
-    primary: '#ffffff',
-    secondary: '#f8fafc',
-    tertiary: '#f1f5f9',
-    dark: '#0f172a'
+    primary: '#ffffff',     // Blanco puro
+    secondary: '#f8fafc',   // Gris casi blanco (muy sutil)
+    tertiary: '#f1f5f9',    // Slate-100
+    dark: '#1e293b'         // Slate-800 para modo oscuro si lo usas
   },
-  
+
   surface: {
     primary: '#ffffff',
-    secondary: '#f8fafc',
-    elevated: '#ffffff'
+    secondary: '#ffffff',
+    elevated: '#ffffff'     // Sin sombras fuertes ni elevación que opaque
   },
-  
+
   text: {
-    primary: '#0f172a',
+    primary: '#1e293b',     // Gris oscuro → excelente legibilidad
     secondary: '#475569',
     tertiary: '#64748b',
     inverse: '#ffffff',
     muted: '#94a3b8'
   },
-  
+
   border: {
-    primary: '#e2e8f0',
+    primary: '#e2e8f0',      // Borde muy claro → separa sin pesar
     secondary: '#cbd5e1',
-    focus: '#6366f1'
+    focus: '#64748b'        // Focus sutil en el primary
   },
-  
-  // Glass morphism effects
+
+  // Glass morphism: muy sutil o casi eliminado para evitar opacidad
   glass: {
-    background: 'rgba(255, 255, 255, 0.25)',
-    border: 'rgba(255, 255, 255, 0.18)',
-    shadow: 'rgba(0, 0, 0, 0.1)'
+    background: 'rgba(255, 255, 255, 0.8)',  // Más opaco → menos velo
+    border: 'rgba(255, 255, 255, 0.4)',
+    shadow: 'rgba(0, 0, 0, 0.08)'
   }
 };
 
@@ -141,7 +147,7 @@ export const spacing = {
   xs: 4,
   sm: 8,
   md: 16,
-  lg: 24,
+  lg: 20,
   xl: 32,
   xxl: 48,
   xxxl: 64

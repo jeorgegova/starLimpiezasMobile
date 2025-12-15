@@ -85,6 +85,16 @@ export const AuthProvider = ({ children }) => {
     ]);
   };
 
+  // Helper function to validate user role
+  const validateRole = (role) => {
+    const validRoles = [DATABASE_CONFIG.roles.ADMIN, DATABASE_CONFIG.roles.USER];
+    if (validRoles.includes(role)) {
+      return role;
+    }
+    console.warn(`Invalid role '${role}' detected, defaulting to '${DATABASE_CONFIG.roles.USER}'`);
+    return DATABASE_CONFIG.roles.USER;
+  };
+
   const initializeAuthWithPersistence = async () => {
     try {
       setLoading(true);
@@ -173,14 +183,23 @@ export const AuthProvider = ({ children }) => {
             role: DATABASE_CONFIG.roles.USER,
             created_at: new Date().toISOString()
           };
-          setUserProfile(profileToUse);
-          await SessionManager.saveUserProfile(profileToUse);
+          // Validate role in fallback profile
+          const validatedProfile = {
+            ...profileToUse,
+            role: validateRole(profileToUse.role)
+          };
+          setUserProfile(validatedProfile);
+          await SessionManager.saveUserProfile(validatedProfile);
           return;
         }
 
-        // Use the data from the database
-        console.log('User profile loaded from database:', data.name);
-        setUserProfile(data);
+        // Validate and use the data from the database
+        const validatedData = {
+          ...data,
+          role: validateRole(data.role)
+        };
+        console.log('User profile loaded from database:', validatedData.name, 'role:', validatedData.role);
+        setUserProfile(validatedData);
 
         // Save to AsyncStorage for persistence
         await SessionManager.saveUserProfile(data);
@@ -199,8 +218,14 @@ export const AuthProvider = ({ children }) => {
           created_at: new Date().toISOString()
         };
 
-        setUserProfile(fallbackProfile);
-        await SessionManager.saveUserProfile(fallbackProfile);
+        // Validate role in fallback profile
+        const validatedFallback = {
+          ...fallbackProfile,
+          role: validateRole(fallbackProfile.role)
+        };
+
+        setUserProfile(validatedFallback);
+        await SessionManager.saveUserProfile(validatedFallback);
       }
 
     } catch (error) {
@@ -214,8 +239,14 @@ export const AuthProvider = ({ children }) => {
         role: DATABASE_CONFIG.roles.USER
       };
 
-      setUserProfile(basicProfile);
-      await SessionManager.saveUserProfile(basicProfile);
+      // Validate role in basic profile
+      const validatedBasic = {
+        ...basicProfile,
+        role: validateRole(basicProfile.role)
+      };
+
+      setUserProfile(validatedBasic);
+      await SessionManager.saveUserProfile(validatedBasic);
     }
   };
 
@@ -248,7 +279,7 @@ export const AuthProvider = ({ children }) => {
           email: email,
           phone: userData.phone || null,
           address: userData.address || null,
-          role: userData.role || DATABASE_CONFIG.roles.USER,
+          role: validateRole(userData.role) || DATABASE_CONFIG.roles.USER,
           created_at: new Date().toISOString()
         };
 

@@ -18,6 +18,8 @@ import ReportsScreen from '../screens/ReportsScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
 import SimpleLoadingScreen from '../components/SimpleLoadingScreen';
 import { modernTheme } from '../theme/ModernTheme';
+import VectorIcon from '../theme/ModernIcon';
+import { IconButton, StatusIcon } from '../theme/ModernIcon';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -32,20 +34,25 @@ const AdminTabNavigator = () => {
 
           switch (route.name) {
             case 'Home':
-              iconName = focused ? 'home-sharp' : 'home-outline';
+              iconName = 'home';
               break;
             case 'Servicios':
-              iconName = focused ? 'sparkles-sharp' : 'sparkles-outline';
+              iconName = 'cleaning';
               break;
             case 'Clientes':
-              iconName = focused ? 'people-sharp' : 'people-outline';
+              iconName = 'people';
+              break;
+            case 'Bonifications':
+              iconName = 'bonus';
+              break;
+            case 'Reports':
+              iconName = 'chart';
               break;
             default:
-              iconName = 'home-outline';
+              iconName = 'home';
           }
 
-          // We'll use text-based icons for now and replace with proper icons later
-          return <Text style={{ fontSize: size, color }}>★</Text>;
+          return <VectorIcon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: modernTheme.colors.primary,
         tabBarInactiveTintColor: modernTheme.colors.text.muted,
@@ -62,7 +69,7 @@ const AdminTabNavigator = () => {
           paddingBottom: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: '600',
         },
         headerShown: false, // We don't want headers in tab navigator
@@ -89,6 +96,20 @@ const AdminTabNavigator = () => {
           tabBarLabel: 'Clientes',
         }}
       />
+      <Tab.Screen
+        name="Bonifications"
+        component={BonificationsScreen}
+        options={{
+          tabBarLabel: 'Bonificaciones',
+        }}
+      />
+      <Tab.Screen
+        name="Reports"
+        component={ReportsScreen}
+        options={{
+          tabBarLabel: 'Reportes',
+        }}
+      />
     </Tab.Navigator>
   );
 };
@@ -103,23 +124,22 @@ const UserTabNavigator = () => {
 
           switch (route.name) {
             case 'Home':
-              iconName = focused ? 'home-sharp' : 'home-outline';
+              iconName = 'home';
               break;
             case 'Servicios':
-              iconName = focused ? 'sparkles-sharp' : 'sparkles-outline';
+              iconName = 'cleaning';
               break;
             case 'Perfil':
-              iconName = focused ? 'person-sharp' : 'person-outline';
+              iconName = 'person';
               break;
             case 'Reportes':
-              iconName = focused ? 'bar-chart-sharp' : 'bar-chart-outline';
+              iconName = 'chart';
               break;
             default:
-              iconName = 'home-outline';
+              iconName = 'home';
           }
 
-          // We'll use text-based icons for now and replace with proper icons later
-          return <Text style={{ fontSize: size, color }}>★</Text>;
+          return <VectorIcon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: modernTheme.colors.primary,
         tabBarInactiveTintColor: modernTheme.colors.text.muted,

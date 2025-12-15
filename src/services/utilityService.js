@@ -77,7 +77,8 @@ export const utilityService = {
         totalServices: servicesResult.count || 0,
         totalUsers: usersResult.count || 0,
         totalLocations: locationsResult.count || 0,
-        servicesByStatus: {}
+        servicesByStatus: {},
+        usersByRole: {}
       };
 
       // Contar servicios por estado
@@ -88,6 +89,17 @@ export const utilityService = {
       if (services) {
         services.forEach(service => {
           stats.servicesByStatus[service.status] = (stats.servicesByStatus[service.status] || 0) + 1;
+        });
+      }
+
+      // Contar usuarios por rol
+      const { data: users } = await supabase
+        .from(DATABASE_CONFIG.tables.users)
+        .select('role');
+
+      if (users) {
+        users.forEach(user => {
+          stats.usersByRole[user.role] = (stats.usersByRole[user.role] || 0) + 1;
         });
       }
 

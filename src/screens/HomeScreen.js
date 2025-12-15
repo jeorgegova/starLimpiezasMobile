@@ -35,9 +35,9 @@ const HomeScreen = () => {
 
   const [servicios, setServicios] = useState([]);
   const [stats, setStats] = useState({
-    servicios: 0,
+    servicios_activos: 0,
     clientes: 0,
-    usuarios: 0
+    servicios_pendientes: 0
   });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,16 +78,16 @@ const HomeScreen = () => {
         // Fallback: get basic services
         const { data: servicesData } = await serviceService.getUserServices(null, true);
         setStats({
-          servicios: servicesData?.length || 0,
-          clientes: 0, // Placeholder
-          usuarios: 0  // Placeholder
+          servicios_activos: servicesData?.filter(s => s.status === 'confirmed').length || 0,
+          clientes: 0, // Placeholder - would need user count with role 'user'
+          servicios_pendientes: servicesData?.filter(s => s.status === 'pending').length || 0
         });
         setServicios(servicesData?.slice(0, 3) || []);
       } else {
         setStats({
-          servicios: statsData.totalServices || 0,
-          clientes: statsData.totalUsers || 0,
-          usuarios: statsData.totalUsers || 0
+          servicios_activos: statsData.servicesByStatus?.confirmed || 0,
+          clientes: statsData.usersByRole?.user || 0,
+          servicios_pendientes: statsData.servicesByStatus?.pending || 0
         });
 
         // Get recent services
@@ -143,13 +143,6 @@ const HomeScreen = () => {
       subtitle: 'Ver y administrar la lista de clientes',
       onPress: () => navigateToScreen('Clientes'),
       color: modernTheme.colors.secondary
-    },
-    {
-      icon: 'employee',
-      title: 'Gestionar Empleados',
-      subtitle: 'Administrar el equipo de trabajo',
-      onPress: () => navigateToScreen('Empleados'),
-      color: modernTheme.colors.accent
     },
     {
       icon: 'admin',
@@ -254,41 +247,42 @@ const HomeScreen = () => {
       <View style={styles.statsContainer}>
         <Text style={styles.statsTitle}>Resumen del Dashboard</Text>
         <View style={styles.statsGrid}>
-          <View style={[
+          <TouchableOpacity style={[
             styles.statCard,
             {
-              backgroundColor: modernTheme.colors.primary + '15',
-              borderLeftColor: modernTheme.colors.primary
+              backgroundColor: modernTheme.colors.warning + '15',
+              borderLeftColor: modernTheme.colors.warning,
+              padding: 16
             }
-          ]}>
-            <Text style={[styles.statIcon, { color: modernTheme.colors.primary }]}>🧹</Text>
-            <Text style={styles.statNumber}>{stats.servicios}</Text>
-            <Text style={styles.statLabel}>Servicios</Text>
-          </View>
-
-          <View style={[
+          ]} onPress={() => navigateToScreen('Servicios')} activeOpacity={0.8}>
+            <Text style={[styles.statIcon, { color: modernTheme.colors.warning }]}>⏳</Text>
+            <Text style={styles.statNumber}>{stats.servicios_pendientes}</Text>
+            <Text style={styles.statLabel}>Servicios Sin{"\n"}Confirmar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[
             styles.statCard,
             {
               backgroundColor: modernTheme.colors.secondary + '15',
               borderLeftColor: modernTheme.colors.secondary
             }
-          ]}>
-            <Text style={[styles.statIcon, { color: modernTheme.colors.secondary }]}>👥</Text>
-            <Text style={styles.statNumber}>{stats.clientes}</Text>
-            <Text style={styles.statLabel}>Clientes</Text>
-          </View>
+          ]} onPress={() => navigateToScreen('Servicios')} activeOpacity={0.8}>
+            <Text style={[styles.statIcon, { color: modernTheme.colors.secondary }]}>🧹</Text>
+            <Text style={styles.statNumber}>{stats.servicios_activos}</Text>
+            <Text style={styles.statLabel}>Servicios Activos</Text>
+          </TouchableOpacity>
 
-          <View style={[
+          <TouchableOpacity style={[
             styles.statCard,
             {
-              backgroundColor: modernTheme.colors.accent + '15',
-              borderLeftColor: modernTheme.colors.accent
+              backgroundColor: modernTheme.colors.primaryLight + '15',
+              borderLeftColor: modernTheme.colors.primary
             }
-          ]}>
-            <Text style={[styles.statIcon, { color: modernTheme.colors.accent }]}>👤</Text>
-            <Text style={styles.statNumber}>{stats.usuarios}</Text>
-            <Text style={styles.statLabel}>Usuarios</Text>
-          </View>
+          ]} onPress={() => navigateToScreen('Clientes')} activeOpacity={0.8}>
+            <Text style={[styles.statIcon, { color: modernTheme.colors.secondaryLight }]}>👥</Text>
+            <Text style={styles.statNumber}>{stats.clientes}</Text>
+            <Text style={styles.statLabel}>Clientes</Text>
+          </TouchableOpacity>
+
         </View>
       </View>
 
@@ -388,8 +382,10 @@ const styles = StyleSheet.create({
   // Header styles
   header: {
     backgroundColor: modernTheme.colors.primary,
-    paddingTop: modernTheme.spacing.xl + modernTheme.spacing.md,
-    paddingBottom: modernTheme.spacing.xl,
+    paddingTop: modernTheme.spacing.xl,
+    paddingBottom: modernTheme.spacing.lg,
+    borderBottomLeftRadius: modernTheme.borderRadius.xxl,
+    borderBottomRightRadius: modernTheme.borderRadius.xxl,
   },
   headerContent: {
     paddingHorizontal: modernTheme.spacing.lg,
@@ -489,7 +485,7 @@ const styles = StyleSheet.create({
     borderRadius: modernTheme.borderRadius.md,
     alignItems: 'center',
     marginBottom: modernTheme.spacing.md,
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
   },
   statIcon: {
     fontSize: 28,
@@ -505,6 +501,7 @@ const styles = StyleSheet.create({
     ...modernTheme.typography.caption,
     color: modernTheme.colors.text.secondary,
     textAlign: 'center',
+    fontSize: 10,
   },
 
   // Section styles
