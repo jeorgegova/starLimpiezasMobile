@@ -15,6 +15,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
 import { userService, DATABASE_CONFIG } from '../services';
+import { modernTheme } from '../theme/ModernTheme';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const ClientesScreen = () => {
   const navigation = useNavigation();
@@ -109,28 +111,23 @@ const ClientesScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>👥 Gestión de Clientes</Text>
-        <Text style={styles.headerSubtitle}>
-          Bienvenido, {userName}
-        </Text>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>← Volver</Text>
+          </TouchableOpacity>
+          <View style={styles.headerTitleSection}>
+            <MaterialIcons name="people" size={28} color={modernTheme.colors.text.inverse} />
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>Gestión de Clientes</Text>
+              <Text style={styles.headerSubtitle}>
+                Bienvenido, {userName}
+              </Text>
+            </View>
+          </View>
+        </View>
       </View>
 
       <View style={styles.content}>
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={addNuevoCliente}
-          >
-            <Text style={styles.addButtonText}>➕ Agregar Nuevo Cliente</Text>
-          </TouchableOpacity>
-        </View>
-
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#3498db" />
@@ -147,6 +144,7 @@ const ClientesScreen = () => {
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
+                <MaterialIcons name="people" size={40} color={modernTheme.colors.text.muted} style={styles.emptyIcon} />
                 <Text style={styles.emptyText}>No hay clientes registrados</Text>
                 <Text style={styles.emptySubtext}>
                   Toca el botón "Agregar Nuevo Cliente" para comenzar
@@ -156,6 +154,10 @@ const ClientesScreen = () => {
           />
         )}
       </View>
+
+      <TouchableOpacity style={styles.floatingButton} onPress={addNuevoCliente}>
+        <MaterialIcons name="add" size={24} color={modernTheme.colors.text.inverse} />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -163,49 +165,44 @@ const ClientesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: modernTheme.colors.background.primary,
   },
   header: {
-    backgroundColor: '#2ecc71',
-    padding: 20,
-    paddingTop: 50,
+    backgroundColor: modernTheme.colors.primary,
+    paddingTop: modernTheme.spacing.lg + 8,
+    paddingBottom: modernTheme.spacing.md,
+  },
+  headerContent: {
+    paddingHorizontal: modernTheme.spacing.lg,
   },
   backButton: {
-    marginBottom: 10,
-    padding: 5,
+    marginBottom: modernTheme.spacing.md,
+    padding: modernTheme.spacing.sm,
   },
   backButtonText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 16,
     fontWeight: '500',
   },
+  headerTitleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTextContainer: {
+    marginLeft: modernTheme.spacing.md,
+    flex: 1,
+  },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 5,
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.inverse,
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#ecf0f1',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.inverse + '90',
   },
   content: {
     flex: 1,
-    padding: 15,
-  },
-  actionsContainer: {
-    marginBottom: 20,
-  },
-  addButton: {
-    backgroundColor: '#27ae60',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
@@ -213,92 +210,96 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#7f8c8d',
+    marginTop: modernTheme.spacing.md,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
   },
   listaContainer: {
-    paddingBottom: 20,
+    paddingHorizontal: modernTheme.spacing.lg,
+    paddingVertical: modernTheme.spacing.md,
+    paddingBottom: 80,
   },
   clienteCard: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: modernTheme.colors.surface.primary,
+    padding: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.lg,
+    marginBottom: modernTheme.spacing.sm,
+    ...modernTheme.shadows.medium,
+    borderLeftWidth: 4,
+    borderLeftColor: modernTheme.colors.primary,
   },
   clienteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: modernTheme.spacing.xs,
   },
   clienteNombre: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.primary,
     flex: 1,
   },
   clienteStatus: {
-    padding: 5,
-    borderRadius: 15,
-    backgroundColor: '#ecf0f1',
+    padding: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.sm,
+    backgroundColor: modernTheme.colors.background.secondary,
   },
   clienteStatusText: {
-    fontSize: 12,
+    ...modernTheme.typography.bodySmall,
     fontWeight: '500',
   },
   clienteInfo: {
-    marginBottom: 15,
+    marginBottom: modernTheme.spacing.sm,
   },
   clienteEmail: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 5,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginBottom: modernTheme.spacing.xs,
   },
   clienteTelefono: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 5,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginBottom: modernTheme.spacing.xs,
   },
   clienteDireccion: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 5,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginBottom: modernTheme.spacing.xs,
   },
   clienteRegistro: {
-    fontSize: 12,
-    color: '#95a5a6',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.muted,
   },
   clienteFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: modernTheme.spacing.sm,
+    marginTop: modernTheme.spacing.sm,
+    paddingTop: modernTheme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: modernTheme.colors.border.primary,
   },
   botonVerServicios: {
-    backgroundColor: '#3498db',
-    padding: 8,
-    borderRadius: 5,
+    backgroundColor: modernTheme.colors.primary,
+    padding: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.sm,
     flex: 0.48,
     alignItems: 'center',
   },
   botonVerServiciosText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '500',
   },
   botonContactar: {
-    backgroundColor: '#2ecc71',
-    padding: 8,
-    borderRadius: 5,
+    backgroundColor: modernTheme.colors.success || '#27ae60',
+    padding: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.sm,
     flex: 0.48,
     alignItems: 'center',
   },
   botonContactarText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -306,18 +307,34 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50,
+    paddingVertical: modernTheme.spacing.xxl,
+  },
+  emptyIcon: {
+    marginBottom: modernTheme.spacing.lg,
+    opacity: 0.5,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#7f8c8d',
-    fontWeight: '600',
-    marginBottom: 10,
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: modernTheme.spacing.sm,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#95a5a6',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.muted,
     textAlign: 'center',
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: modernTheme.colors.primary,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...modernTheme.shadows.medium,
   },
 });
 
