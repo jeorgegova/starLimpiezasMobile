@@ -74,6 +74,26 @@ export const serviceService = {
     return { error };
   },
 
+  // Obtener servicios disponibles
+  async getAvailableServices() {
+    const { data, error } = await supabase
+      .from(DATABASE_CONFIG.tables.service_available)
+      .select('*')
+      .order('name');
+
+    return { data, error };
+  },
+
+  // Obtener ubicaciones
+  async getLocations() {
+    const { data, error } = await supabase
+      .from(DATABASE_CONFIG.tables.location)
+      .select('*')
+      .order('location');
+
+    return { data, error };
+  },
+
   // Obtener servicios por filtros (para reportes)
   async getServicesByFilters(filters = {}) {
     let query = supabase

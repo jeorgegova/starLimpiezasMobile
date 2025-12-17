@@ -15,10 +15,13 @@ import {
   Modal,
   TextInput,
   Animated,
-  ScrollView
+  ScrollView,
+  Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
+import {Calendar} from 'react-native-calendars';
+import {Picker} from '@react-native-picker/picker';
 import { serviceService, utilityService, DATABASE_CONFIG } from '../services';
 import { modernTheme } from '../theme/ModernTheme';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -49,6 +52,11 @@ const ServiciosScreen = () => {
     location_id: null
   });
   const [locations, setLocations] = useState([]);
+  const [availableServices, setAvailableServices] = useState([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [attemptedSave, setAttemptedSave] = useState(false);
 
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [searchText, setSearchText] = useState('');
@@ -82,6 +90,7 @@ const ServiciosScreen = () => {
   useEffect(() => {
     loadServicios();
     loadLocations();
+    loadAvailableServices();
 
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -118,10 +127,16 @@ const ServiciosScreen = () => {
   };
 
   const loadLocations = async () => {
-    try {
-      setLocations([]);
-    } catch (error) {
-      console.error('Error loading locations:', error);
+    const { data, error } = await serviceService.getLocations();
+    if (!error) {
+      setLocations(data || []);
+    }
+  };
+
+  const loadAvailableServices = async () => {
+    const { data, error } = await serviceService.getAvailableServices();
+    if (!error) {
+      setAvailableServices(data || []);
     }
   };
 
@@ -134,13 +149,15 @@ const ServiciosScreen = () => {
     setEditingService(null);
     setServiceData({
       service_name: '',
-      assigned_date: '',
+      assigned_date: new Date().toISOString().split('T')[0],
       address: '',
       phone: '',
       shift: DATABASE_CONFIG.shifts.MORNING,
-      hours: '',
+      hours: '4',
       location_id: null
     });
+    setSelectedDate(new Date());
+    setAttemptedSave(false);
     setShowCreateModal(true);
   };
 
@@ -148,33 +165,50 @@ const ServiciosScreen = () => {
     setEditingService(servicio);
     setServiceData({
       service_name: servicio.service_name || '',
-      assigned_date: servicio.assigned_date || '',
+      assigned_date: servicio.assigned_date || new Date().toISOString().split('T')[0],
       address: servicio.address || '',
       phone: servicio.phone || '',
       shift: servicio.shift || DATABASE_CONFIG.shifts.MORNING,
-      hours: servicio.hours || '',
+      hours: servicio.hours || '4',
       location_id: servicio.location_id || null
     });
+    const date = servicio.assigned_date ? new Date(servicio.assigned_date) : new Date();
+    setSelectedDate(date);
+    setAttemptedSave(false);
     setShowCreateModal(true);
   };
 
   const handleSaveService = async () => {
-    if (!serviceData.service_name || !serviceData.assigned_date) {
-      Alert.alert('Error', 'Por favor completa los campos requeridos');
+    setAttemptedSave(true);
+    if (!serviceData.service_name || !serviceData.assigned_date || !serviceData.address || !serviceData.phone || !serviceData.shift || !serviceData.location_id) {
+      Alert.alert('Error', 'Por favor completa todos los campos requeridos');
       return;
     }
 
     try {
-      const isAdminUser = isAdmin();
-
       if (editingService) {
-        Alert.alert('Info', 'Funcionalidad de edición pendiente de implementar');
-        setShowCreateModal(false);
-        loadServicios();
+        const { error } = await serviceService.updateService(editingService.id, serviceData);
+        if (error) {
+          Alert.alert('Error', 'No se pudo actualizar el servicio');
+        } else {
+          Alert.alert('Éxito', 'Servicio actualizado');
+          setShowCreateModal(false);
+          loadServicios();
+        }
       } else {
-        Alert.alert('Info', 'Funcionalidad de creación pendiente de implementar');
-        setShowCreateModal(false);
-        loadServicios();
+        if (serviceData.service_name === 'Limpieza Residencial') {
+          setShowPriceModal(true);
+        } else {
+          Alert.alert('Solicitud en proceso', 'Su solicitud está en proceso de validación y se comunicarán para concretar el servicio.');
+          const { error } = await serviceService.createUserService({...serviceData, user_id: userProfile?.id});
+          if (error) {
+            Alert.alert('Error', 'No se pudo crear el servicio');
+          } else {
+            Alert.alert('Éxito', 'Servicio solicitado');
+            setShowCreateModal(false);
+            loadServicios();
+          }
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Error de conexión');
@@ -188,7 +222,21 @@ const ServiciosScreen = () => {
     }
 
     try {
-      Alert.alert('Info', `Funcionalidad de ${action} pendiente de implementar`);
+      const actions = {
+        confirm: 'confirmed',
+        cancel: 'cancelled',
+        complete: 'completed'
+      };
+      const status = actions[action];
+      if (status) {
+        const { error } = await serviceService.updateServiceStatus(servicio.id, status);
+        if (error) {
+          Alert.alert('Error', 'No se pudo actualizar el estado');
+        } else {
+          Alert.alert('Éxito', `Servicio ${action}ado`);
+          loadServicios();
+        }
+      }
     } catch (error) {
       Alert.alert('Error', 'Error de conexión');
     }
@@ -589,30 +637,53 @@ const ServiciosScreen = () => {
             <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Nombre del servicio *</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Nombre del servicio"
-                  value={serviceData.service_name}
-                  onChangeText={(text) => setServiceData(prev => ({ ...prev, service_name: text }))}
-                  placeholderTextColor={modernTheme.colors.text.muted}
-                />
+                <View style={[styles.modalInput, attemptedSave && !serviceData.service_name && styles.errorInput]}>
+                  <Picker
+                    selectedValue={serviceData.service_name}
+                    onValueChange={(itemValue) => setServiceData(prev => ({ ...prev, service_name: itemValue }))}
+                    style={{color: modernTheme.colors.text.primary}}
+                    itemStyle={{color: modernTheme.colors.text.primary}}
+                  >
+                    <Picker.Item label="Seleccionar tipo de servicio" value="" />
+                    {availableServices.map((service) => (
+                      <Picker.Item key={service.id} label={service.name} value={service.name} />
+                    ))}
+                  </Picker>
+                </View>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Fecha (YYYY-MM-DD) *</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="2024-12-25"
-                  value={serviceData.assigned_date}
-                  onChangeText={(text) => setServiceData(prev => ({ ...prev, assigned_date: text }))}
-                  placeholderTextColor={modernTheme.colors.text.muted}
-                />
+                <Text style={styles.inputLabel}>Fecha *</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.modalInput, attemptedSave && !serviceData.assigned_date && styles.errorInput]}>
+                  <Text style={{color: serviceData.assigned_date ? modernTheme.colors.text.primary : modernTheme.colors.text.muted, fontSize: 14}}>
+                    {serviceData.assigned_date ? formatDate(serviceData.assigned_date) : 'Seleccionar fecha'}
+                  </Text>
+                </TouchableOpacity>
+                <Modal visible={showDatePicker} transparent={true} animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
+                  <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)'}}>
+                    <View style={{backgroundColor: 'white', padding: 20, borderRadius: 10, width: '90%'}}>
+                      <Calendar
+                        onDayPress={(day) => {
+                          setSelectedDate(new Date(day.year, day.month - 1, day.day));
+                          setServiceData(prev => ({ ...prev, assigned_date: day.dateString }));
+                          setShowDatePicker(false);
+                        }}
+                        markedDates={{
+                          [serviceData.assigned_date]: {selected: true, selectedColor: modernTheme.colors.primary}
+                        }}
+                      />
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)} style={{marginTop: 10, alignSelf: 'center'}}>
+                        <Text style={{color: modernTheme.colors.text.primary}}>Cancelar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Modal>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Dirección</Text>
+                <Text style={styles.inputLabel}>Dirección *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, attemptedSave && !serviceData.address && styles.errorInput]}
                   placeholder="Calle 123, Ciudad"
                   value={serviceData.address}
                   onChangeText={(text) => setServiceData(prev => ({ ...prev, address: text }))}
@@ -621,10 +692,27 @@ const ServiciosScreen = () => {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Teléfono</Text>
+                <Text style={styles.inputLabel}>Ubicación *</Text>
+                <View style={[styles.modalInput, attemptedSave && !serviceData.location_id && styles.errorInput]}>
+                  <Picker
+                    selectedValue={serviceData.location_id}
+                    onValueChange={(itemValue) => setServiceData(prev => ({ ...prev, location_id: itemValue }))}
+                    style={{color: modernTheme.colors.text.primary}}
+                    itemStyle={{color: modernTheme.colors.text.primary}}
+                  >
+                    <Picker.Item label="Seleccionar ubicación" value={null} />
+                    {locations.map((location) => (
+                      <Picker.Item key={location.id} label={location.location} value={location.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Teléfono *</Text>
                 <TextInput
-                  style={styles.modalInput}
-                  placeholder="+57 300 123 4567"
+                  style={[styles.modalInput, attemptedSave && !serviceData.phone && styles.errorInput]}
+                  placeholder="+34 600 123 456"
                   value={serviceData.phone}
                   onChangeText={(text) => setServiceData(prev => ({ ...prev, phone: text }))}
                   keyboardType="phone-pad"
@@ -633,7 +721,7 @@ const ServiciosScreen = () => {
               </View>
 
               <View style={styles.shiftContainer}>
-                <Text style={styles.inputLabel}>Turno</Text>
+                <Text style={styles.inputLabel}>Turno *</Text>
                 <View style={styles.shiftOptions}>
                   {Object.values(DATABASE_CONFIG.shifts).map((shift) => (
                     <TouchableOpacity
@@ -662,13 +750,19 @@ const ServiciosScreen = () => {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Horas estimadas</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="2 horas"
-                  value={serviceData.hours}
-                  onChangeText={(text) => setServiceData(prev => ({ ...prev, hours: text }))}
-                  placeholderTextColor={modernTheme.colors.text.muted}
-                />
+                <View style={styles.modalInput}>
+                  <Picker
+                    selectedValue={serviceData.hours}
+                    onValueChange={(itemValue) => setServiceData(prev => ({ ...prev, hours: itemValue }))}
+                    style={{color: modernTheme.colors.text.primary}}
+                    itemStyle={{color: modernTheme.colors.text.primary}}
+                  >
+                    <Picker.Item label="Seleccionar horas" value="" />
+                    {Array.from({length: 9}, (_, i) => i + 4).map((hour) => (
+                      <Picker.Item key={hour} label={`${hour} horas`} value={hour.toString()} />
+                    ))}
+                  </Picker>
+                </View>
               </View>
             </ScrollView>
 
@@ -690,6 +784,49 @@ const ServiciosScreen = () => {
               />
             </View>
           </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Price Modal */}
+      <Modal
+        visible={showPriceModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPriceModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Información de Precios</Text>
+            <Text style={{marginBottom: 10}}>Precio: 20€ por hora</Text>
+            <Text style={{marginBottom: 10}}>Se cobra por horas con un mínimo de 4 horas. Vendrán 2 personas (cada persona realiza 2 horas de trabajo).</Text>
+            <Text style={{marginBottom: 20, fontWeight: 'bold'}}>Total a pagar: {20 * parseInt(serviceData.hours)}€</Text>
+            <View style={styles.modalButtons}>
+              <IconButton
+                text="Cancelar"
+                variant="outline"
+                size="md"
+                onPress={() => setShowPriceModal(false)}
+                style={styles.modalButton}
+              />
+              <IconButton
+                text="Confirmar"
+                variant="primary"
+                size="md"
+                onPress={async () => {
+                  const { error } = await serviceService.createUserService({...serviceData, user_id: userProfile?.id});
+                  if (error) {
+                    Alert.alert('Error', 'No se pudo crear el servicio');
+                  } else {
+                    Alert.alert('Éxito', 'Servicio creado');
+                    setShowPriceModal(false);
+                    setShowCreateModal(false);
+                    loadServicios();
+                  }
+                }}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
         </View>
       </Modal>
     </View>
@@ -1033,6 +1170,9 @@ const styles = StyleSheet.create({
   },
   modalInput: {
     ...modernTheme.componentStyles.input,
+  },
+  errorInput: {
+    borderColor: modernTheme.colors.error || '#e74c3c',
   },
   shiftContainer: {
     marginBottom: modernTheme.spacing.lg,

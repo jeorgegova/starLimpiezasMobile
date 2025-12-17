@@ -21,7 +21,8 @@ export const DATABASE_CONFIG = {
     available_dates: 'available_dates',
     customer_loyalty: 'customer_loyalty',
     location: 'location',
-    service_discount_config: 'service_discount_config'
+    service_discount_config: 'service_discount_config',
+    service_available: 'service_available'
   },
   
   // ROLES del sistema
@@ -41,8 +42,19 @@ export const DATABASE_CONFIG = {
   // Shifts disponibles
   shifts: {
     MORNING: 'morning',
-    AFTERNOON: 'afternoon',
-    EVENING: 'evening'
+    AFTERNOON: 'afternoon'
+  },
+
+  // Tipos de servicios de limpieza
+  serviceTypes: {
+    RESIDENTIAL: 'Limpieza Residencial',
+    COMMERCIAL: 'Limpieza Comercial',
+    OFFICE: 'Limpieza de Oficinas',
+    POST_CONSTRUCTION: 'Limpieza Post-Obra',
+    WINDOW: 'Limpieza de Ventanas',
+    CARPET: 'Limpieza de Alfombras',
+    DEEP_CLEANING: 'Limpieza Profunda',
+    MOVE_IN_OUT: 'Limpieza Mudanza'
   }
 };
 
