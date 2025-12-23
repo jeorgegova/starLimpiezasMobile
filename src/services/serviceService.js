@@ -5,8 +5,9 @@ import { DATABASE_CONFIG } from './supabaseConfig';
  * Servicios para gestión de servicios de limpieza
  */
 export const serviceService = {
+
   // Obtener servicios (con filtro por usuario si no es admin)
-  async getUserServices(userId = null, isAdmin = false) {
+  async getUserServices(userId = null, isAdmin = false, filters = {}) {
     let query = supabase
       .from(DATABASE_CONFIG.tables.user_services)
       .select(`
@@ -18,6 +19,23 @@ export const serviceService = {
     // Si no es admin, solo puede ver sus propios servicios
     if (!isAdmin && userId) {
       query = query.eq('user_id', userId);
+    }
+
+    // Aplicar filtros adicionales (nuevo parámetro filters)
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    if (filters.service_type) {
+      query = query.ilike('service_name', `%${filters.service_type}%`);
+    }
+
+    if (filters.date_from) {
+      query = query.gte('assigned_date', filters.date_from);
+    }
+
+    if (filters.date_to) {
+      query = query.lte('assigned_date', filters.date_to);
     }
 
     const { data, error } = await query.order('assigned_date', { ascending: false });
