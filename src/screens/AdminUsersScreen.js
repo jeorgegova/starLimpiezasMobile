@@ -18,13 +18,17 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
 import { userService, DATABASE_CONFIG } from '../services';
+import { modernTheme } from '../theme/ModernTheme';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const AdminUsersScreen = () => {
   const navigation = useNavigation();
   const { userName, hasPermission, isAdmin } = useAuth();
   const [users, setUsers] = useState([]);
+  const [usersFiltrados, setUsersFiltrados] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [busquedaUsuario, setBusquedaUsuario] = useState('');
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newRole, setNewRole] = useState('');
@@ -39,9 +43,28 @@ const AdminUsersScreen = () => {
       );
       return;
     }
-    
+
     loadUsers();
   }, []);
+
+  // Función para filtrar usuarios por nombre, email o teléfono
+  const filtrarUsuarios = (texto) => {
+    if (!texto.trim()) {
+      setUsersFiltrados(users);
+    } else {
+      const usuariosFiltrados = users.filter(user =>
+        user.name?.toLowerCase().includes(texto.toLowerCase()) ||
+        user.email?.toLowerCase().includes(texto.toLowerCase()) ||
+        user.phone?.toLowerCase().includes(texto.toLowerCase())
+      );
+      setUsersFiltrados(usuariosFiltrados);
+    }
+  };
+
+  // Aplicar filtro automáticamente cuando cambie la búsqueda
+  useEffect(() => {
+    filtrarUsuarios(busquedaUsuario);
+  }, [busquedaUsuario, users]);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -50,7 +73,9 @@ const AdminUsersScreen = () => {
       if (error) {
         Alert.alert('Error', 'No se pudieron cargar los usuarios');
       } else {
-        setUsers(data || []);
+        const usersData = data || [];
+        setUsers(usersData);
+        setUsersFiltrados(usersData); // Inicializar usuarios filtrados
       }
     } catch (error) {
       Alert.alert('Error', 'Error de conexión');
@@ -145,17 +170,11 @@ const AdminUsersScreen = () => {
       </View>
       
       <View style={styles.userFooter}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.botonEditarRol}
           onPress={() => openRoleModal(item)}
         >
-          <Text style={styles.botonEditarRolText}>👑 Cambiar Rol</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.botonDetalles}
-          onPress={() => Alert.alert('Detalles', `Usuario: ${item.name}\nEmail: ${item.email}\nTeléfono: ${item.phone}`)}
-        >
-          <Text style={styles.botonDetallesText}>👁️ Ver Detalles</Text>
+          <Text style={styles.botonEditarRolText}>👤 Cambiar Rol</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -182,16 +201,47 @@ const AdminUsersScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>👥 Administración de Usuarios</Text>
-        <Text style={styles.headerSubtitle}>
-          Bienvenido, {userName}
-        </Text>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>← Volver</Text>
+          </TouchableOpacity>
+          <View style={styles.headerTitleSection}>
+            <MaterialIcons name="people" size={28} color={modernTheme.colors.text.inverse} />
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>Administración de Usuarios</Text>
+              <Text style={styles.headerSubtitle}>
+                Bienvenido, {userName}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Barra de búsqueda */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <MaterialIcons name="search" size={20} color={modernTheme.colors.text.secondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por nombre, email o teléfono..."
+            value={busquedaUsuario}
+            onChangeText={setBusquedaUsuario}
+            placeholderTextColor={modernTheme.colors.text.muted}
+          />
+          {busquedaUsuario !== '' && (
+            <TouchableOpacity
+              onPress={() => setBusquedaUsuario('')}
+              style={styles.clearSearchButton}
+            >
+              <MaterialIcons name="clear" size={18} color={modernTheme.colors.text.secondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {busquedaUsuario !== '' && (
+          <Text style={styles.searchResultsText}>
+            {usersFiltrados.length} resultado{usersFiltrados.length !== 1 ? 's' : ''} encontrado{usersFiltrados.length !== 1 ? 's' : ''}
+          </Text>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -221,16 +271,20 @@ const AdminUsersScreen = () => {
           </View>
         ) : (
           <FlatList
-            data={users}
+            data={usersFiltrados}
             renderItem={renderUser}
             keyExtractor={(item, index) => item.id?.toString() || index.toString()}
             contentContainerStyle={styles.listaContainer}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[modernTheme.colors.primary]} tintColor={modernTheme.colors.primary} />
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
+                <MaterialIcons name="people" size={40} color={modernTheme.colors.text.muted} style={styles.emptyIcon} />
                 <Text style={styles.emptyText}>No hay usuarios registrados</Text>
+                <Text style={styles.emptySubtext}>
+                  Los usuarios aparecerán aquí cuando se registren
+                </Text>
               </View>
             }
           />
@@ -316,125 +370,178 @@ const AdminUsersScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // Contenedor principal
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: modernTheme.colors.background.primary,
   },
+
+  // Acceso denegado
   accessDeniedContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
+    backgroundColor: modernTheme.colors.background.primary,
+    padding: modernTheme.spacing.lg,
   },
   accessDeniedText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#e74c3c',
-    marginBottom: 10,
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.error,
+    marginBottom: modernTheme.spacing.md,
   },
   accessDeniedSubtext: {
-    fontSize: 16,
-    color: '#7f8c8d',
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.muted,
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: modernTheme.spacing.xl,
+  },
+
+  // Header
+  header: {
+    backgroundColor: modernTheme.colors.primary,
+    paddingTop: modernTheme.spacing.lg + 8,
+    paddingBottom: modernTheme.spacing.md,
+  },
+  headerContent: {
+    paddingHorizontal: modernTheme.spacing.lg,
   },
   backButton: {
-    marginBottom: 10,
-    padding: 5,
+    marginBottom: modernTheme.spacing.md,
+    padding: modernTheme.spacing.sm,
   },
   backButtonText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 16,
     fontWeight: '500',
   },
-  header: {
-    backgroundColor: '#8e44ad',
-    padding: 20,
-    paddingTop: 50,
+  headerTitleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTextContainer: {
+    marginLeft: modernTheme.spacing.md,
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 5,
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.inverse,
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#ecf0f1',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.inverse + '90',
   },
+
+  // Búsqueda
+  searchContainer: {
+    paddingHorizontal: modernTheme.spacing.lg,
+    paddingVertical: modernTheme.spacing.md,
+    backgroundColor: modernTheme.colors.background.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: modernTheme.colors.border.primary,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: modernTheme.colors.background.secondary,
+    borderRadius: modernTheme.borderRadius.lg,
+    paddingHorizontal: modernTheme.spacing.md,
+    height: 48,
+    borderWidth: 1,
+    borderColor: modernTheme.colors.border.primary,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: modernTheme.spacing.sm,
+    marginRight: modernTheme.spacing.sm,
+    fontSize: 16,
+    color: modernTheme.colors.text.primary,
+  },
+  clearSearchButton: {
+    padding: modernTheme.spacing.xs,
+  },
+  searchResultsText: {
+    marginTop: modernTheme.spacing.sm,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    textAlign: 'center',
+  },
+
+  // Contenido principal
   content: {
     flex: 1,
-    padding: 15,
   },
+
+  // Estadísticas
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: modernTheme.colors.surface.primary,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.lg,
+    marginHorizontal: modernTheme.spacing.lg,
+    marginVertical: modernTheme.spacing.md,
+    ...modernTheme.shadows.medium,
   },
   statCard: {
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 24,
+    ...modernTheme.typography.h3,
+    color: modernTheme.colors.primary,
     fontWeight: 'bold',
-    color: '#8e44ad',
   },
   statLabel: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginTop: 5,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginTop: modernTheme.spacing.xs,
   },
+
+  // Loading
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#7f8c8d',
+    marginTop: modernTheme.spacing.md,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
   },
+
+  // Lista de usuarios
   listaContainer: {
-    paddingBottom: 20,
+    paddingHorizontal: modernTheme.spacing.lg,
+    paddingVertical: modernTheme.spacing.md,
+    paddingBottom: 80,
   },
+
+  // Tarjeta de usuario
   userCard: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: modernTheme.colors.surface.primary,
+    padding: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.lg,
+    marginBottom: modernTheme.spacing.sm,
+    ...modernTheme.shadows.medium,
     borderLeftWidth: 4,
-    borderLeftColor: '#8e44ad',
+    borderLeftColor: modernTheme.colors.primary,
   },
   userHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: modernTheme.spacing.xs,
   },
   userAvatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#3498db',
+    backgroundColor: modernTheme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: modernTheme.spacing.md,
   },
   userAvatarText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 20,
     fontWeight: 'bold',
   },
@@ -442,159 +549,167 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.primary,
     marginBottom: 2,
   },
   userEmail: {
-    fontSize: 14,
-    color: '#7f8c8d',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
     marginBottom: 2,
   },
   userPhone: {
-    fontSize: 12,
-    color: '#95a5a6',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.muted,
   },
   roleBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
+    paddingHorizontal: modernTheme.spacing.md,
+    paddingVertical: modernTheme.spacing.xs,
+    borderRadius: modernTheme.borderRadius.lg,
   },
   roleBadgeText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 12,
     fontWeight: '600',
   },
   userDetails: {
-    marginBottom: 15,
+    marginBottom: modernTheme.spacing.sm,
   },
   userAddress: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 5,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginBottom: modernTheme.spacing.xs,
   },
   userCreatedAt: {
-    fontSize: 12,
-    color: '#95a5a6',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.muted,
   },
   userFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: modernTheme.spacing.xs,
+    marginTop: modernTheme.spacing.sm,
+    paddingTop: modernTheme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: modernTheme.colors.border.primary,
   },
   botonEditarRol: {
-    backgroundColor: '#f39c12',
-    padding: 8,
-    borderRadius: 5,
-    flex: 0.48,
+    backgroundColor: modernTheme.colors.primary,
+    padding: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.sm,
+    flex: 1,
     alignItems: 'center',
   },
   botonEditarRolText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '500',
   },
-  botonDetalles: {
-    backgroundColor: '#3498db',
-    padding: 8,
-    borderRadius: 5,
-    flex: 0.48,
-    alignItems: 'center',
-  },
-  botonDetallesText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
+
+  // Estado vacío
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50,
+    paddingVertical: modernTheme.spacing.xxl,
+  },
+  emptyIcon: {
+    marginBottom: modernTheme.spacing.lg,
+    opacity: 0.5,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#7f8c8d',
-    fontWeight: '600',
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: modernTheme.spacing.sm,
   },
+  emptySubtext: {
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.muted,
+    textAlign: 'center',
+  },
+
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: modernTheme.colors.text.primary + '80',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: modernTheme.spacing.lg,
   },
   modalContent: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    margin: 20,
-    borderRadius: 15,
-    width: '90%',
+    backgroundColor: modernTheme.colors.surface.primary,
+    padding: modernTheme.spacing.xl,
+    borderRadius: modernTheme.borderRadius.lg,
+    width: '100%',
     maxWidth: 400,
+    ...modernTheme.shadows.xlarge,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: modernTheme.spacing.lg,
   },
   modalUserInfo: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 5,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginBottom: modernTheme.spacing.xs,
   },
   roleSelectionContainer: {
-    marginBottom: 20,
+    marginBottom: modernTheme.spacing.lg,
   },
   roleSelectionLabel: {
-    fontSize: 16,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.primary,
     fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 15,
+    marginBottom: modernTheme.spacing.md,
   },
   roleOption: {
-    padding: 15,
-    borderRadius: 8,
+    padding: modernTheme.spacing.md,
+    borderRadius: modernTheme.borderRadius.md,
     borderWidth: 2,
-    borderColor: '#e0e0e0',
-    marginBottom: 10,
+    borderColor: modernTheme.colors.border.primary,
+    backgroundColor: modernTheme.colors.background.secondary,
+    marginBottom: modernTheme.spacing.sm,
   },
   roleOptionSelected: {
-    borderColor: '#8e44ad',
-    backgroundColor: '#f8f4ff',
+    borderColor: modernTheme.colors.primary,
+    backgroundColor: modernTheme.colors.primary + '15',
   },
   roleOptionText: {
-    fontSize: 16,
-    color: '#2c3e50',
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
   },
   roleOptionTextSelected: {
-    color: '#8e44ad',
+    color: modernTheme.colors.primary,
     fontWeight: '600',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    gap: modernTheme.spacing.md,
   },
   modalButton: {
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 100,
+    flex: 1,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.md,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#95a5a6',
+    backgroundColor: modernTheme.colors.text.secondary,
   },
   saveButton: {
-    backgroundColor: '#8e44ad',
+    backgroundColor: modernTheme.colors.primary,
   },
   cancelButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.inverse,
     fontWeight: '600',
   },
   saveButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.inverse,
     fontWeight: '600',
   },
 });

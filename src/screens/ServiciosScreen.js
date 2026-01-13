@@ -16,13 +16,14 @@ import {
   TextInput,
   Animated,
   ScrollView,
-  Platform
+  Platform,
+  Linking
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
-import {Calendar} from 'react-native-calendars';
-import {Picker} from '@react-native-picker/picker';
-import { serviceService, utilityService, DATABASE_CONFIG } from '../services';
+import { Calendar } from 'react-native-calendars';
+import { Picker } from '@react-native-picker/picker';
+import { serviceService, utilityService, userService, bonificationService, DATABASE_CONFIG } from '../services';
 import { modernTheme } from '../theme/ModernTheme';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { IconButton, StatusIcon } from '../theme/ModernIcon';
@@ -53,6 +54,10 @@ const ServiciosScreen = () => {
   });
   const [locations, setLocations] = useState([]);
   const [availableServices, setAvailableServices] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [discountConfigs, setDiscountConfigs] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [discountInfo, setDiscountInfo] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showPriceModal, setShowPriceModal] = useState(false);
@@ -84,6 +89,15 @@ const ServiciosScreen = () => {
     });
   }, [servicios, selectedStatus, searchText, searchType]);
 
+  // Check discount eligibility when service or user changes
+  useEffect(() => {
+    if (isAdmin() && serviceData.service_name && selectedUserId) {
+      checkDiscountEligibility();
+    } else {
+      setDiscountInfo(null);
+    }
+  }, [serviceData.service_name, selectedUserId, isAdmin]);
+
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
 
@@ -91,6 +105,11 @@ const ServiciosScreen = () => {
     loadServicios();
     loadLocations();
     loadAvailableServices();
+
+    if (isAdmin()) {
+      loadUsers();
+      loadDiscountConfigs();
+    }
 
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -140,6 +159,58 @@ const ServiciosScreen = () => {
     }
   };
 
+  const loadUsers = async () => {
+    const { data, error } = await userService.getUsersByRole(DATABASE_CONFIG.roles.USER);
+    if (!error) {
+      setUsers(data || []);
+    }
+  };
+
+  const loadDiscountConfigs = async () => {
+    const { data, error } = await bonificationService.getDiscountConfigs();
+    if (!error) {
+      setDiscountConfigs(data || []);
+    }
+  };
+
+  const checkDiscountEligibility = async () => {
+    try {
+      // Get user's services for this service type
+      const { data: userServices, error } = await serviceService.getUserServices(selectedUserId, false);
+      if (error) return;
+
+      // Find discount config for this service type
+      const discountConfig = discountConfigs.find(config =>
+        config.service_type == serviceData.service_name && config.active
+      );
+
+      if (!discountConfig) {
+        setDiscountInfo(null);
+        return;
+      }
+
+      // Count completed services of this type
+      const completedServices = userServices.filter(service =>
+        service.service_name.toLowerCase() === serviceData.service_name.toLowerCase() &&
+        service.status === DATABASE_CONFIG.serviceStatus.COMPLETED
+      ).length;
+
+      // Check if user has services_required - 1 services
+      if (completedServices >= discountConfig.services_required - 1) {
+        setDiscountInfo({
+          discountPercentage: discountConfig.discount_percentage,
+          servicesCompleted: completedServices,
+          servicesRequired: discountConfig.services_required
+        });
+      } else {
+        setDiscountInfo(null);
+      }
+    } catch (error) {
+      console.error('Error checking discount eligibility:', error);
+      setDiscountInfo(null);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     loadServicios().finally(() => setRefreshing(false));
@@ -156,6 +227,8 @@ const ServiciosScreen = () => {
       hours: '4',
       location_id: null
     });
+    setSelectedUserId(isAdmin() ? null : userProfile?.id);
+    setDiscountInfo(null);
     setSelectedDate(new Date());
     setAttemptedSave(false);
     setShowCreateModal(true);
@@ -180,7 +253,7 @@ const ServiciosScreen = () => {
 
   const handleSaveService = async () => {
     setAttemptedSave(true);
-    if (!serviceData.service_name || !serviceData.assigned_date || !serviceData.address || !serviceData.phone || !serviceData.shift || !serviceData.location_id) {
+    if (!serviceData.service_name || !serviceData.assigned_date || !serviceData.address || !serviceData.phone || !serviceData.shift || !serviceData.location_id || (isAdmin() && !selectedUserId)) {
       Alert.alert('Error', 'Por favor completa todos los campos requeridos');
       return;
     }
@@ -196,11 +269,12 @@ const ServiciosScreen = () => {
           loadServicios();
         }
       } else {
-        if (serviceData.service_name === 'Limpieza Residencial') {
+        if (serviceData.service_name === 'Limpieza de Casas') {
           setShowPriceModal(true);
         } else {
           Alert.alert('Solicitud en proceso', 'Su solicitud está en proceso de validación y se comunicarán para concretar el servicio.');
-          const { error } = await serviceService.createUserService({...serviceData, user_id: userProfile?.id});
+          const userId = isAdmin() ? selectedUserId : userProfile?.id;
+          const { error } = await serviceService.createUserService({ ...serviceData, user_id: userId });
           if (error) {
             Alert.alert('Error', 'No se pudo crear el servicio');
           } else {
@@ -322,7 +396,14 @@ const ServiciosScreen = () => {
               </View>
               <View style={styles.infoRow}>
                 <MaterialIcons name="phone" size={16} color={modernTheme.colors.text.secondary} />
-                <Text style={styles.servicioText}>{item.phone || 'No especificado'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.servicioText}>{item.phone || 'No especificado'}</Text>
+                </View>
+                {isAdmin() && item.phone && (
+                  <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.phone}`)}>
+                    <MaterialIcons name="call" size={16} color={modernTheme.colors.primary} />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
@@ -641,8 +722,8 @@ const ServiciosScreen = () => {
                   <Picker
                     selectedValue={serviceData.service_name}
                     onValueChange={(itemValue) => setServiceData(prev => ({ ...prev, service_name: itemValue }))}
-                    style={{color: modernTheme.colors.text.primary}}
-                    itemStyle={{color: modernTheme.colors.text.primary}}
+                    style={{ color: modernTheme.colors.text.primary }}
+                    itemStyle={{ color: modernTheme.colors.text.primary }}
                   >
                     <Picker.Item label="Seleccionar tipo de servicio" value="" />
                     {availableServices.map((service) => (
@@ -652,16 +733,35 @@ const ServiciosScreen = () => {
                 </View>
               </View>
 
+              {isAdmin() && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Cliente *</Text>
+                  <View style={[styles.modalInput, attemptedSave && !selectedUserId && styles.errorInput]}>
+                    <Picker
+                      selectedValue={selectedUserId}
+                      onValueChange={(itemValue) => setSelectedUserId(itemValue)}
+                      style={{ color: modernTheme.colors.text.primary }}
+                      itemStyle={{ color: modernTheme.colors.text.primary }}
+                    >
+                      <Picker.Item label="Seleccionar cliente" value={null} />
+                      {users.map((user) => (
+                        <Picker.Item key={user.id} label={`${user.name} (${user.email})`} value={user.id} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              )}
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Fecha *</Text>
                 <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.modalInput, attemptedSave && !serviceData.assigned_date && styles.errorInput]}>
-                  <Text style={{color: serviceData.assigned_date ? modernTheme.colors.text.primary : modernTheme.colors.text.muted, fontSize: 14}}>
+                  <Text style={{ color: serviceData.assigned_date ? modernTheme.colors.text.primary : modernTheme.colors.text.muted, fontSize: 14 }}>
                     {serviceData.assigned_date ? formatDate(serviceData.assigned_date) : 'Seleccionar fecha'}
                   </Text>
                 </TouchableOpacity>
                 <Modal visible={showDatePicker} transparent={true} animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
-                  <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)'}}>
-                    <View style={{backgroundColor: 'white', padding: 20, borderRadius: 10, width: '90%'}}>
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 10, width: '90%' }}>
                       <Calendar
                         onDayPress={(day) => {
                           setSelectedDate(new Date(day.year, day.month - 1, day.day));
@@ -669,11 +769,11 @@ const ServiciosScreen = () => {
                           setShowDatePicker(false);
                         }}
                         markedDates={{
-                          [serviceData.assigned_date]: {selected: true, selectedColor: modernTheme.colors.primary}
+                          [serviceData.assigned_date]: { selected: true, selectedColor: modernTheme.colors.primary }
                         }}
                       />
-                      <TouchableOpacity onPress={() => setShowDatePicker(false)} style={{marginTop: 10, alignSelf: 'center'}}>
-                        <Text style={{color: modernTheme.colors.text.primary}}>Cancelar</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)} style={{ marginTop: 10, alignSelf: 'center' }}>
+                        <Text style={{ color: modernTheme.colors.text.primary }}>Cancelar</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -697,8 +797,8 @@ const ServiciosScreen = () => {
                   <Picker
                     selectedValue={serviceData.location_id}
                     onValueChange={(itemValue) => setServiceData(prev => ({ ...prev, location_id: itemValue }))}
-                    style={{color: modernTheme.colors.text.primary}}
-                    itemStyle={{color: modernTheme.colors.text.primary}}
+                    style={{ color: modernTheme.colors.text.primary }}
+                    itemStyle={{ color: modernTheme.colors.text.primary }}
                   >
                     <Picker.Item label="Seleccionar ubicación" value={null} />
                     {locations.map((location) => (
@@ -754,16 +854,30 @@ const ServiciosScreen = () => {
                   <Picker
                     selectedValue={serviceData.hours}
                     onValueChange={(itemValue) => setServiceData(prev => ({ ...prev, hours: itemValue }))}
-                    style={{color: modernTheme.colors.text.primary}}
-                    itemStyle={{color: modernTheme.colors.text.primary}}
+                    style={{ color: modernTheme.colors.text.primary }}
+                    itemStyle={{ color: modernTheme.colors.text.primary }}
                   >
                     <Picker.Item label="Seleccionar horas" value="" />
-                    {Array.from({length: 9}, (_, i) => i + 4).map((hour) => (
+                    {Array.from({ length: 9 }, (_, i) => i + 4).map((hour) => (
                       <Picker.Item key={hour} label={`${hour} horas`} value={hour.toString()} />
                     ))}
                   </Picker>
                 </View>
               </View>
+
+              {discountInfo && (
+                <View style={styles.discountInfo}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: modernTheme.spacing.sm }}>
+                    <MaterialIcons name="local-offer" size={20} color={modernTheme.colors.success} />
+                    <Text style={styles.discountInfoText}>
+                      ¡Este cliente puede recibir un descuento {discountInfo.discountPercentage}%!
+                    </Text>
+                  </View>
+                  <Text style={styles.discountInfoSubtext}>
+                    Ha completado {discountInfo.servicesCompleted} de {discountInfo.servicesRequired} servicios requeridos.
+                  </Text>
+                </View>
+              )}
             </ScrollView>
 
             <View style={styles.modalButtons}>
@@ -797,9 +911,9 @@ const ServiciosScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Información de Precios</Text>
-            <Text style={{marginBottom: 10}}>Precio: 20€ por hora</Text>
-            <Text style={{marginBottom: 10}}>Se cobra por horas con un mínimo de 4 horas. Vendrán 2 personas (cada persona realiza 2 horas de trabajo).</Text>
-            <Text style={{marginBottom: 20, fontWeight: 'bold'}}>Total a pagar: {20 * parseInt(serviceData.hours)}€</Text>
+            <Text style={{ marginBottom: 10 }}>Precio: 20€ por hora</Text>
+            <Text style={{ marginBottom: 10 }}>Se cobra por horas con un mínimo de 4 horas. Vendrán 2 personas (cada persona realiza 2 horas de trabajo).</Text>
+            <Text style={{ marginBottom: 20, fontWeight: 'bold' }}>Total a pagar: {20 * parseInt(serviceData.hours)}€</Text>
             <View style={styles.modalButtons}>
               <IconButton
                 text="Cancelar"
@@ -813,7 +927,8 @@ const ServiciosScreen = () => {
                 variant="primary"
                 size="md"
                 onPress={async () => {
-                  const { error } = await serviceService.createUserService({...serviceData, user_id: userProfile?.id});
+                  const userId = isAdmin() ? selectedUserId : userProfile?.id;
+                  const { error } = await serviceService.createUserService({ ...serviceData, user_id: userId });
                   if (error) {
                     Alert.alert('Error', 'No se pudo crear el servicio');
                   } else {
@@ -1205,6 +1320,22 @@ const styles = StyleSheet.create({
   shiftOptionTextSelected: {
     color: modernTheme.colors.primary,
     fontWeight: '600',
+  },
+  discountInfo: {
+    backgroundColor: modernTheme.colors.success + '15',
+    padding: modernTheme.spacing.md,
+    borderRadius: modernTheme.borderRadius.md,
+    marginBottom: modernTheme.spacing.md,
+  },
+  discountInfoText: {
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.success,
+    fontWeight: '600',
+  },
+  discountInfoSubtext: {
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginTop: modernTheme.spacing.xs,
   },
   modalButtons: {
     flexDirection: 'row',

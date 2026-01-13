@@ -1,7 +1,7 @@
 /**
- * Pantalla de Bonificaciones para Star Limpiezas Mobile
+ * Pantalla de Descuentos para Star Limpiezas Mobile
  * Solo accesible para administradores
- * Gestiona customer_loyalty y service_discount_config
+ * Gestiona service_discount_config
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -19,27 +19,23 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
-import { bonificationService, DATABASE_CONFIG } from '../services';
+import { bonificationService, serviceService, utilityService, DATABASE_CONFIG } from '../services';
+import { modernTheme } from '../theme/ModernTheme';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import {Picker} from '@react-native-picker/picker';
 
 const BonificationsScreen = () => {
   const navigation = useNavigation();
   const { userName, hasPermission, isAdmin } = useAuth();
 
-  const [loyaltyPrograms, setLoyaltyPrograms] = useState([]);
   const [discountConfigs, setDiscountConfigs] = useState([]);
+  const [filteredDiscounts, setFilteredDiscounts] = useState([]);
+  const [availableServices, setAvailableServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('loyalty'); // 'loyalty' or 'discounts'
-  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
   const [showDiscountModal, setShowDiscountModal] = useState(false);
-  const [editingLoyalty, setEditingLoyalty] = useState(null);
   const [editingDiscount, setEditingDiscount] = useState(null);
-
-  const [loyaltyData, setLoyaltyData] = useState({
-    user_id: '',
-    service_type: '',
-    points: 0
-  });
 
   const [discountData, setDiscountData] = useState({
     service_type: '',
@@ -47,6 +43,10 @@ const BonificationsScreen = () => {
     active: true,
     services_required: 1
   });
+
+  // Temporary string values for inputs
+  const [discountPercentageText, setDiscountPercentageText] = useState('');
+  const [servicesRequiredText, setServicesRequiredText] = useState('');
 
   useEffect(() => {
     // Verificar permisos
@@ -60,87 +60,54 @@ const BonificationsScreen = () => {
     }
 
     loadData();
+    loadAvailableServices();
   }, [isAdmin, hasPermission, navigation]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [loyaltyResult, discountResult] = await Promise.all([
-        supabaseClient.getLoyaltyPrograms(),
-        supabaseClient.getDiscountConfigs()
-      ]);
-
-      if (loyaltyResult.data) {
-        setLoyaltyPrograms(loyaltyResult.data);
-      }
-      if (discountResult.data) {
-        setDiscountConfigs(discountResult.data);
+      const { data, error } = await bonificationService.getDiscountConfigs();
+      if (error) {
+        Alert.alert('Error', 'No se pudieron cargar las configuraciones de descuento');
+      } else {
+        const discounts = data || [];
+        setDiscountConfigs(discounts);
+        setFilteredDiscounts(discounts);
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudieron cargar los datos de bonificaciones');
+      Alert.alert('Error', 'Error de conexión');
     } finally {
       setLoading(false);
     }
   };
 
+  const loadAvailableServices = async () => {
+    const { data, error } = await serviceService.getAvailableServices();
+    if (!error) {
+      setAvailableServices(data || []);
+    }
+  };
+
+  // Filter discounts based on status
+  const applyFilters = () => {
+    let filtered = [...discountConfigs];
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(discount =>
+        statusFilter === 'active' ? discount.active : !discount.active
+      );
+    }
+    setFilteredDiscounts(filtered);
+  };
+
+  useEffect(() => {
+    applyFilters();
+  }, [discountConfigs, statusFilter]);
+
+  const formatDate = (dateString) => utilityService.formatDate(dateString);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadData().finally(() => setRefreshing(false));
-  };
-
-  // Funciones para Loyalty Programs
-  const openLoyaltyModal = (loyalty = null) => {
-    setEditingLoyalty(loyalty);
-    if (loyalty) {
-      setLoyaltyData({
-        user_id: loyalty.user_id || '',
-        service_type: loyalty.service_type || '',
-        points: loyalty.points || 0
-      });
-    } else {
-      setLoyaltyData({
-        user_id: '',
-        service_type: '',
-        points: 0
-      });
-    }
-    setShowLoyaltyModal(true);
-  };
-
-  const handleSaveLoyalty = async () => {
-    if (!loyaltyData.user_id || !loyaltyData.service_type) {
-      Alert.alert('Error', 'Por favor completa los campos requeridos');
-      return;
-    }
-
-    try {
-      if (editingLoyalty) {
-        // Actualizar
-        const { data, error } = await bonificationService.updateLoyaltyProgram(
-          editingLoyalty.id,
-          loyaltyData
-        );
-        if (error) {
-          Alert.alert('Error', 'No se pudo actualizar el programa de lealtad');
-        } else {
-          Alert.alert('Éxito', 'Programa de lealtad actualizado');
-          setShowLoyaltyModal(false);
-          loadData();
-        }
-      } else {
-        // Crear
-        const { data, error } = await bonificationService.createLoyaltyProgram(loyaltyData);
-        if (error) {
-          Alert.alert('Error', 'No se pudo crear el programa de lealtad');
-        } else {
-          Alert.alert('Éxito', 'Programa de lealtad creado');
-          setShowLoyaltyModal(false);
-          loadData();
-        }
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Error de conexión');
-    }
   };
 
   // Funciones para Discount Configs
@@ -153,6 +120,8 @@ const BonificationsScreen = () => {
         active: discount.active !== false,
         services_required: discount.services_required || 1
       });
+      setDiscountPercentageText(discount.discount_percentage ? discount.discount_percentage.toString() : '');
+      setServicesRequiredText(discount.services_required ? discount.services_required.toString() : '');
     } else {
       setDiscountData({
         service_type: '',
@@ -160,12 +129,14 @@ const BonificationsScreen = () => {
         active: true,
         services_required: 1
       });
+      setDiscountPercentageText('');
+      setServicesRequiredText('');
     }
     setShowDiscountModal(true);
   };
 
   const handleSaveDiscount = async () => {
-    if (!discountData.service_type || discountData.discount_percentage <= 0) {
+    if (!discountData.service_type || discountPercentageText === '' || parseFloat(discountPercentageText) < 0 || parseFloat(discountPercentageText) > 100 || servicesRequiredText === '' || parseInt(servicesRequiredText) < 1) {
       Alert.alert('Error', 'Por favor completa los campos requeridos correctamente');
       return;
     }
@@ -216,34 +187,13 @@ const BonificationsScreen = () => {
     }
   };
 
-  const renderLoyaltyItem = ({ item }) => (
-    <View style={styles.loyaltyCard}>
-      <View style={styles.loyaltyHeader}>
-        <Text style={styles.loyaltyService}>{item.service_type}</Text>
-        <Text style={styles.loyaltyPoints}>{item.points} puntos</Text>
-      </View>
-      <Text style={styles.loyaltyUser}>Usuario ID: {item.user_id}</Text>
-      <Text style={styles.loyaltyDate}>
-        Actualizado: {new Date(item.updated_at).toLocaleDateString('es-ES')}
-      </Text>
-      <View style={styles.loyaltyActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => openLoyaltyModal(item)}
-        >
-          <Text style={styles.editButtonText}>✏️ Editar</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   const renderDiscountItem = ({ item }) => (
     <View style={styles.discountCard}>
       <View style={styles.discountHeader}>
         <Text style={styles.discountService}>{item.service_type}</Text>
         <View style={[
           styles.statusBadge,
-          { backgroundColor: item.active ? '#2ecc71' : '#e74c3c' }
+          { backgroundColor: item.active ? modernTheme.colors.successDark : modernTheme.colors.error }
         ]}>
           <Text style={styles.statusBadgeText}>
             {item.active ? 'Activo' : 'Inactivo'}
@@ -254,17 +204,17 @@ const BonificationsScreen = () => {
         Descuento: {item.discount_percentage}% | Servicios requeridos: {item.services_required}
       </Text>
       <Text style={styles.discountDate}>
-        Actualizado: {new Date(item.updated_at).toLocaleDateString('es-ES')}
+        Actualizado: {formatDate(item.updated_at)}
       </Text>
       <View style={styles.discountActions}>
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => openDiscountModal(item)}
         >
-          <Text style={styles.editButtonText}>✏️ Editar</Text>
+          <Text style={styles.editButtonText}>Editar</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.statusButton, { backgroundColor: item.active ? '#e74c3c' : '#2ecc71' }]}
+          style={[styles.statusButton, { backgroundColor: item.active ? modernTheme.colors.error : modernTheme.colors.successDark }]}
           onPress={() => toggleDiscountStatus(item)}
         >
           <Text style={styles.statusButtonText}>
@@ -296,174 +246,82 @@ const BonificationsScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>🎁 Gestión de Bonificaciones</Text>
-        <Text style={styles.headerSubtitle}>
-          Bienvenido, {userName}
-        </Text>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>← Volver</Text>
+          </TouchableOpacity>
+          <View style={styles.headerTitleSection}>
+            <MaterialIcons name="card-giftcard" size={28} color={modernTheme.colors.text.inverse} />
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>Gestión de Descuentos</Text>
+              <Text style={styles.headerSubtitle}>
+                Bienvenido, {userName}
+              </Text>
+            </View>
+          </View>
+        </View>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
+      {/* Filter */}
+      <View style={styles.filterContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'loyalty' && styles.tabActive]}
-          onPress={() => setActiveTab('loyalty')}
+          style={[styles.filterButton, statusFilter === 'all' && styles.filterButtonActive]}
+          onPress={() => setStatusFilter('all')}
         >
-          <Text style={[styles.tabText, activeTab === 'loyalty' && styles.tabTextActive]}>
-            👑 Programas de Lealtad
+          <Text style={[styles.filterButtonText, statusFilter === 'all' && styles.filterButtonTextActive]}>
+            Todos ({discountConfigs.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'discounts' && styles.tabActive]}
-          onPress={() => setActiveTab('discounts')}
+          style={[styles.filterButton, statusFilter === 'active' && styles.filterButtonActive]}
+          onPress={() => setStatusFilter('active')}
         >
-          <Text style={[styles.tabText, activeTab === 'discounts' && styles.tabTextActive]}>
-            💰 Descuentos
+          <Text style={[styles.filterButtonText, statusFilter === 'active' && styles.filterButtonTextActive]}>
+            Activos ({discountConfigs.filter(d => d.active).length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterButton, statusFilter === 'inactive' && styles.filterButtonActive]}
+          onPress={() => setStatusFilter('inactive')}
+        >
+          <Text style={[styles.filterButtonText, statusFilter === 'inactive' && styles.filterButtonTextActive]}>
+            Inactivos ({discountConfigs.filter(d => !d.active).length})
           </Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
-        {activeTab === 'loyalty' && (
-          <>
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => openLoyaltyModal()}
-              >
-                <Text style={styles.addButtonText}>➕ Crear Programa de Lealtad</Text>
-              </TouchableOpacity>
-            </View>
 
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#3498db" />
-                <Text style={styles.loadingText}>Cargando programas de lealtad...</Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={modernTheme.colors.primary} />
+            <Text style={styles.loadingText}>Cargando configuraciones de descuento...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredDiscounts}
+            renderItem={renderDiscountItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContainer}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[modernTheme.colors.primary]} tintColor={modernTheme.colors.primary} />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <MaterialIcons name="discount" size={40} color={modernTheme.colors.text.muted} style={styles.emptyIcon} />
+                <Text style={styles.emptyText}>No hay configuraciones de descuento</Text>
+                <Text style={styles.emptySubtext}>
+                  Crea la primera configuración de descuento
+                </Text>
               </View>
-            ) : (
-              <FlatList
-                data={loyaltyPrograms}
-                renderItem={renderLoyaltyItem}
-                keyExtractor={(item) => item.id.toString()}
-                contentContainerStyle={styles.listContainer}
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No hay programas de lealtad</Text>
-                    <Text style={styles.emptySubtext}>
-                      Crea el primer programa de lealtad para tus clientes
-                    </Text>
-                  </View>
-                }
-              />
-            )}
-          </>
-        )}
-
-        {activeTab === 'discounts' && (
-          <>
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => openDiscountModal()}
-              >
-                <Text style={styles.addButtonText}>➕ Crear Configuración de Descuento</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#3498db" />
-                <Text style={styles.loadingText}>Cargando configuraciones de descuento...</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={discountConfigs}
-                renderItem={renderDiscountItem}
-                keyExtractor={(item) => item.id.toString()}
-                contentContainerStyle={styles.listContainer}
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No hay configuraciones de descuento</Text>
-                    <Text style={styles.emptySubtext}>
-                      Crea la primera configuración de descuento
-                    </Text>
-                  </View>
-                }
-              />
-            )}
-          </>
+            }
+          />
         )}
       </View>
 
-      {/* Modal para Loyalty Programs */}
-      <Modal
-        visible={showLoyaltyModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowLoyaltyModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingLoyalty ? 'Editar Programa de Lealtad' : 'Crear Programa de Lealtad'}
-            </Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="ID de Usuario *"
-              value={loyaltyData.user_id}
-              onChangeText={(text) => setLoyaltyData(prev => ({ ...prev, user_id: text }))}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Tipo de Servicio *"
-              value={loyaltyData.service_type}
-              onChangeText={(text) => setLoyaltyData(prev => ({ ...prev, service_type: text }))}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Puntos"
-              value={loyaltyData.points.toString()}
-              onChangeText={(text) => setLoyaltyData(prev => ({
-                ...prev,
-                points: parseInt(text) || 0
-              }))}
-              keyboardType="numeric"
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowLoyaltyModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveLoyalty}
-              >
-                <Text style={styles.saveButtonText}>
-                  {editingLoyalty ? 'Actualizar' : 'Crear'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <TouchableOpacity style={styles.floatingButton} onPress={() => openDiscountModal()}>
+        <MaterialIcons name="add" size={24} color={modernTheme.colors.text.inverse} />
+      </TouchableOpacity>
 
       {/* Modal para Discount Configs */}
       <Modal
@@ -474,50 +332,75 @@ const BonificationsScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingDiscount ? 'Editar Configuración de Descuento' : 'Crear Configuración de Descuento'}
-            </Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Tipo de Servicio *"
-              value={discountData.service_type}
-              onChangeText={(text) => setDiscountData(prev => ({ ...prev, service_type: text }))}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Porcentaje de Descuento *"
-              value={discountData.discount_percentage.toString()}
-              onChangeText={(text) => setDiscountData(prev => ({
-                ...prev,
-                discount_percentage: parseFloat(text) || 0
-              }))}
-              keyboardType="numeric"
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Servicios Requeridos"
-              value={discountData.services_required.toString()}
-              onChangeText={(text) => setDiscountData(prev => ({
-                ...prev,
-                services_required: parseInt(text) || 1
-              }))}
-              keyboardType="numeric"
-            />
-
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>Activo:</Text>
-              <TouchableOpacity
-                style={[styles.switch, discountData.active && styles.switchActive]}
-                onPress={() => setDiscountData(prev => ({ ...prev, active: !prev.active }))}
-              >
-                <Text style={[styles.switchText, discountData.active && styles.switchTextActive]}>
-                  {discountData.active ? 'Sí' : 'No'}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.modalHeader}>
+              <MaterialIcons name="discount" size={28} color={modernTheme.colors.primary} />
+              <Text style={styles.modalTitle}>
+                {editingDiscount ? 'Editar Configuración de Descuento' : 'Crear Configuración de Descuento'}
+              </Text>
             </View>
+
+            <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Tipo de Servicio *</Text>
+                <View style={styles.modalInput}>
+                  <Picker
+                    selectedValue={discountData.service_type}
+                    onValueChange={(itemValue) => setDiscountData(prev => ({ ...prev, service_type: itemValue }))}
+                    style={{color: modernTheme.colors.text.primary}}
+                    itemStyle={{color: modernTheme.colors.text.primary}}
+                  >
+                    <Picker.Item label="Seleccionar tipo de servicio" value="" />
+                    {availableServices.map((service) => (
+                      <Picker.Item key={service.id} label={service.name} value={service.name} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Porcentaje de Descuento *</Text>
+                <View style={styles.percentageInputContainer}>
+                  <TextInput
+                    style={styles.percentageInput}
+                    value={discountPercentageText}
+                    onChangeText={(text) => {
+                      setDiscountPercentageText(text);
+                      const value = parseFloat(text) || 0;
+                      setDiscountData(prev => ({ ...prev, discount_percentage: value }));
+                    }}
+                    keyboardType="numeric"
+                    maxLength={3}
+                  />
+                  <Text style={styles.percentageSymbol}>%</Text>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Servicios Requeridos *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={servicesRequiredText}
+                  onChangeText={(text) => {
+                    setServicesRequiredText(text);
+                    const value = parseInt(text) || 1;
+                    setDiscountData(prev => ({ ...prev, services_required: value }));
+                  }}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.switchContainer}>
+                <Text style={styles.switchLabel}>Activo:</Text>
+                <TouchableOpacity
+                  style={[styles.switch, discountData.active && styles.switchActive]}
+                  onPress={() => setDiscountData(prev => ({ ...prev, active: !prev.active }))}
+                >
+                  <Text style={[styles.switchText, discountData.active && styles.switchTextActive]}>
+                    {discountData.active ? 'Sí' : 'No'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -544,333 +427,342 @@ const BonificationsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // Contenedor principal
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: modernTheme.colors.background.primary,
   },
+
+  // Acceso denegado
   accessDeniedContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
+    backgroundColor: modernTheme.colors.background.primary,
+    padding: modernTheme.spacing.lg,
   },
   accessDeniedText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#e74c3c',
-    marginBottom: 10,
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.error,
+    marginBottom: modernTheme.spacing.md,
   },
   accessDeniedSubtext: {
-    fontSize: 16,
-    color: '#7f8c8d',
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.muted,
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: modernTheme.spacing.xl,
+  },
+
+  // Header
+  header: {
+    backgroundColor: modernTheme.colors.primary,
+    paddingTop: modernTheme.spacing.lg + 8,
+    paddingBottom: modernTheme.spacing.md,
+  },
+  headerContent: {
+    paddingHorizontal: modernTheme.spacing.lg,
   },
   backButton: {
-    marginBottom: 10,
-    padding: 5,
+    marginBottom: modernTheme.spacing.md,
+    padding: modernTheme.spacing.sm,
   },
   backButtonText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 16,
     fontWeight: '500',
   },
-  header: {
-    backgroundColor: '#8e44ad',
-    padding: 20,
-    paddingTop: 50,
+  headerTitleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTextContainer: {
+    marginLeft: modernTheme.spacing.md,
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 5,
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.inverse,
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#ecf0f1',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.inverse + '90',
   },
-  tabContainer: {
+
+  // Filter
+  filterContainer: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    marginHorizontal: 15,
-    marginTop: 15,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'space-around',
+    backgroundColor: modernTheme.colors.surface.primary,
+    marginHorizontal: modernTheme.spacing.lg,
+    marginVertical: modernTheme.spacing.md,
+    borderRadius: modernTheme.borderRadius.lg,
+    padding: modernTheme.spacing.sm,
+    ...modernTheme.shadows.medium,
   },
-  tab: {
-    flex: 1,
-    padding: 15,
-    alignItems: 'center',
-    borderRadius: 10,
+  filterButton: {
+    paddingHorizontal: modernTheme.spacing.md,
+    paddingVertical: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.md,
   },
-  tabActive: {
-    backgroundColor: '#8e44ad',
+  filterButtonActive: {
+    backgroundColor: modernTheme.colors.primary,
   },
-  tabText: {
-    fontSize: 14,
+  filterButtonText: {
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
     fontWeight: '600',
-    color: '#7f8c8d',
   },
-  tabTextActive: {
-    color: '#ffffff',
+  filterButtonTextActive: {
+    color: modernTheme.colors.text.inverse,
   },
+
+  // Contenido
   content: {
     flex: 1,
-    padding: 15,
+    paddingHorizontal: modernTheme.spacing.lg,
   },
-  actionsContainer: {
-    marginBottom: 20,
-  },
-  addButton: {
-    backgroundColor: '#2ecc71',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+
+  // Loading
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#7f8c8d',
+    marginTop: modernTheme.spacing.md,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
   },
+
+  // Lista
   listContainer: {
-    paddingBottom: 20,
+    paddingBottom: modernTheme.spacing.xl,
   },
-  loyaltyCard: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: '#8e44ad',
-  },
-  loyaltyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  loyaltyService: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    flex: 1,
-  },
-  loyaltyPoints: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#8e44ad',
-  },
-  loyaltyUser: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 5,
-  },
-  loyaltyDate: {
-    fontSize: 12,
-    color: '#95a5a6',
-  },
-  loyaltyActions: {
-    marginTop: 10,
-    alignItems: 'flex-end',
-  },
+
+  // Tarjetas de descuento
   discountCard: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: modernTheme.colors.surface.primary,
+    padding: modernTheme.spacing.md,
+    borderRadius: modernTheme.borderRadius.lg,
+    marginBottom: modernTheme.spacing.sm,
+    ...modernTheme.shadows.medium,
     borderLeftWidth: 4,
-    borderLeftColor: '#f39c12',
+    borderLeftColor: modernTheme.colors.warning,
   },
   discountHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: modernTheme.spacing.xs,
   },
   discountService: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.primary,
     flex: 1,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
+    paddingHorizontal: modernTheme.spacing.md,
+    paddingVertical: modernTheme.spacing.xs,
+    borderRadius: modernTheme.borderRadius.lg,
   },
   statusBadgeText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 12,
     fontWeight: '600',
   },
   discountDetails: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 5,
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginBottom: modernTheme.spacing.xs,
   },
   discountDate: {
-    fontSize: 12,
-    color: '#95a5a6',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.muted,
   },
   discountActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
+    marginTop: modernTheme.spacing.sm,
   },
+
+  // Botones
   editButton: {
-    backgroundColor: '#f39c12',
-    padding: 8,
-    borderRadius: 5,
+    backgroundColor: modernTheme.colors.primary,
+    padding: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.sm,
     flex: 1,
     alignItems: 'center',
-    marginRight: 5,
+    marginRight: modernTheme.spacing.xs,
   },
   editButtonText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '500',
   },
   statusButton: {
-    padding: 8,
-    borderRadius: 5,
+    padding: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.sm,
     flex: 1,
     alignItems: 'center',
-    marginLeft: 5,
+    marginLeft: modernTheme.spacing.xs,
   },
   statusButtonText: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
     fontSize: 14,
     fontWeight: '500',
   },
+
+  // Estado vacío
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50,
+    paddingVertical: modernTheme.spacing.xxl,
+  },
+  emptyIcon: {
+    marginBottom: modernTheme.spacing.lg,
+    opacity: 0.5,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#7f8c8d',
-    fontWeight: '600',
-    marginBottom: 10,
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.secondary,
     textAlign: 'center',
+    marginBottom: modernTheme.spacing.sm,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#95a5a6',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.muted,
     textAlign: 'center',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+
+  // Botón flotante
+  floatingButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: modernTheme.colors.primary,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    ...modernTheme.shadows.medium,
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: modernTheme.colors.text.primary + '80',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: modernTheme.spacing.lg,
   },
   modalContent: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    margin: 20,
-    borderRadius: 15,
-    width: '90%',
+    backgroundColor: modernTheme.colors.surface.primary,
+    padding: modernTheme.spacing.xl,
+    borderRadius: modernTheme.borderRadius.lg,
+    width: '100%',
     maxWidth: 400,
     maxHeight: '80%',
+    ...modernTheme.shadows.xlarge,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: modernTheme.spacing.lg,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    ...modernTheme.typography.h4,
+    color: modernTheme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginTop: modernTheme.spacing.md,
+  },
+  modalForm: {
+    marginBottom: modernTheme.spacing.lg,
+    maxHeight: '70%',
+  },
+  inputGroup: {
+    marginBottom: modernTheme.spacing.lg,
+  },
+  inputLabel: {
+    ...modernTheme.typography.label,
+    color: modernTheme.colors.text.primary,
+    marginBottom: modernTheme.spacing.sm,
+  },
+  percentageInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...modernTheme.componentStyles.input,
+  },
+  percentageInput: {
+    flex: 1,
+    color: modernTheme.colors.text.primary,
+  },
+  percentageSymbol: {
+    marginLeft: modernTheme.spacing.sm,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.secondary,
+    fontWeight: 'bold',
   },
   modalInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 15,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    ...modernTheme.componentStyles.input,
+    marginBottom: modernTheme.spacing.md,
   },
   switchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: modernTheme.spacing.lg,
   },
   switchLabel: {
-    fontSize: 16,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.primary,
     fontWeight: '600',
-    color: '#2c3e50',
-    marginRight: 15,
+    marginRight: modernTheme.spacing.md,
   },
   switch: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: modernTheme.spacing.lg,
+    paddingVertical: modernTheme.spacing.sm,
+    borderRadius: modernTheme.borderRadius.xl,
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: modernTheme.colors.border.primary,
   },
   switchActive: {
-    backgroundColor: '#2ecc71',
-    borderColor: '#2ecc71',
+    backgroundColor: modernTheme.colors.success,
+    borderColor: modernTheme.colors.success,
   },
   switchText: {
-    fontSize: 14,
-    color: '#7f8c8d',
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
     fontWeight: '600',
   },
   switchTextActive: {
-    color: '#ffffff',
+    color: modernTheme.colors.text.inverse,
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    gap: modernTheme.spacing.md,
   },
   modalButton: {
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 100,
+    flex: 1,
+    padding: modernTheme.spacing.lg,
+    borderRadius: modernTheme.borderRadius.md,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#95a5a6',
+    backgroundColor: modernTheme.colors.text.secondary,
   },
   saveButton: {
-    backgroundColor: '#8e44ad',
+    backgroundColor: modernTheme.colors.primary,
   },
   cancelButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.inverse,
     fontWeight: '600',
   },
   saveButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+    ...modernTheme.typography.body,
+    color: modernTheme.colors.text.inverse,
     fontWeight: '600',
   },
 });

@@ -14,7 +14,8 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
-  ScrollView
+  ScrollView,
+  Linking
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
@@ -310,7 +311,13 @@ const ClientesScreen = () => {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.botonContactar}
-          onPress={() => Alert.alert('Contactar', `Contactar a: ${item.name}`)}
+          onPress={() => {
+            if (item.phone) {
+              Linking.openURL(`tel:${item.phone}`);
+            } else {
+              Alert.alert('Sin teléfono', 'Este cliente no tiene un número de teléfono registrado.');
+            }
+          }}
         >
           <Text style={styles.botonContactarText}>📞 Contactar</Text>
         </TouchableOpacity>
