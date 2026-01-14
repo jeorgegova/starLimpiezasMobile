@@ -17,7 +17,8 @@ import {
   Modal,
   TextInput,
   ScrollView,
-  Share
+  Share,
+  Dimensions
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../services/AuthContext';
@@ -25,6 +26,12 @@ import { Calendar } from 'react-native-calendars';
 import { serviceService, DATABASE_CONFIG } from '../services';
 import { modernTheme } from '../theme/ModernTheme';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import RNFS from 'react-native-fs';
+import { Platform } from 'react-native';
+import * as XLSX from 'xlsx';
+import { convert } from 'react-native-html-to-pdf';
+
+const { width } = Dimensions.get('window');
 
 const ReportsScreen = () => {
   const navigation = useNavigation();
@@ -36,211 +43,119 @@ const ReportsScreen = () => {
     isUser
   } = useAuth();
 
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showFiltersModal, setShowFiltersModal] = useState(false);
-  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
-  const [showDateFromPicker, setShowDateFromPicker] = useState(false);
-  const [showDateToPicker, setShowDateToPicker] = useState(false);
-  const [selectedDateFrom, setSelectedDateFrom] = useState(new Date());
-  const [selectedDateTo, setSelectedDateTo] = useState(new Date());
-
-  // Filtros y búsqueda
-  const [selectedStatus, setSelectedStatus] = useState(null);
+  const initialEndDate = new Date();
+  const initialStartDate = new Date();
+  initialStartDate.setDate(initialEndDate.getDate() - 30);
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState([]);
+  const [selectedClient, setSelectedClient] = useState([]);
+  const [selectedLocation, setSelectedLocation] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showFormatModal, setShowFormatModal] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [searchType, setSearchType] = useState('service_name');
-
-  // Filtros avanzados
-  const [filters, setFilters] = useState({
-    status: '',
-    service_type: '',
-    date_from: '',
-    date_to: '',
-    user_id: isUser() ? userProfile?.id : ''
-  });
-
-  // Calcular conteos por estado
-  const statusCounts = useMemo(() => {
-    const counts = {};
-    Object.values(DATABASE_CONFIG.serviceStatus).forEach(status => {
-      counts[status] = services.filter(s => s.status === status).length;
-    });
-    return counts;
-  }, [services]);
-
-  const filteredServices = useMemo(() => {
-    let filtered = [...services];
-
-    // Filtros básicos
-    if (selectedStatus && selectedStatus !== 'all') {
-      filtered = filtered.filter(service => service.status === selectedStatus);
-    }
-
-    if (searchText) {
-      filtered = filtered.filter(service => {
-        let value = '';
-        switch (searchType) {
-          case 'service_name':
-            value = service.service_name || '';
-            break;
-          case 'address':
-            value = service.address || '';
-            break;
-          case 'user':
-            value = service.user_name || '';
-            break;
-        }
-        return value.toLowerCase().includes(searchText.toLowerCase());
-      });
-    }
-
-    // Filtros avanzados
-    if (filters.status) {
-      filtered = filtered.filter(service => service.status === filters.status);
-    }
-
-    if (filters.service_type) {
-      filtered = filtered.filter(service =>
-        service.service_name?.toLowerCase().includes(filters.service_type.toLowerCase())
-      );
-    }
-
-    if (filters.date_from) {
-      const fromDate = new Date(filters.date_from);
-      filtered = filtered.filter(service =>
-        new Date(service.assigned_date) >= fromDate
-      );
-    }
-
-    if (filters.date_to) {
-      const toDate = new Date(filters.date_to);
-      filtered = filtered.filter(service =>
-        new Date(service.assigned_date) <= toDate
-      );
-    }
-
-    if (filters.user_id && isAdmin()) {
-      filtered = filtered.filter(service => service.user_id === filters.user_id);
-    }
-
-    return filtered;
-  }, [services, selectedStatus, searchText, searchType, filters]);
-
+  const [showSummary, setShowSummary] = useState(true);
+  const [sortConfig, setSortConfig] = useState({ key: 'fecha', direction: 'desc' });
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   useEffect(() => {
-    loadServices();
+    loadData();
   }, []);
 
-  const loadServices = async () => {
-    setLoading(true);
-    try {
-      const isAdminUser = isAdmin();
-      const userId = userProfile?.id;
-
-      const { data, error } = await serviceService.getServicesByFilters(filters);
-
-      if (error) {
-        Alert.alert('Error', 'No se pudieron cargar los servicios');
-      } else {
-        setServices(data || []);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Error de conexión');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (isLoaded) {
+      fetchServices();
     }
+  }, [startDate, endDate, isLoaded]);
+
+  const formatDateToString = (date) => {
+    if (!date || isNaN(new Date(date))) return '01/01/1970';
+    const d = new Date(date);
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadServices().finally(() => setRefreshing(false));
+  const loadData = async () => {
+    setIsLoaded(true);
   };
 
-  const clearFilters = () => {
-    setSelectedStatus(null);
-    setSearchText('');
-    setFilters({
-      status: '',
-      service_type: '',
-      date_from: '',
-      date_to: '',
+  const fetchServices = async () => {
+    const filters = {
+      date_from: startDate.toISOString().split('T')[0],
+      date_to: endDate.toISOString().split('T')[0],
       user_id: isUser() ? userProfile?.id : ''
+    };
+
+    const { data, error } = await serviceService.getServicesByFilters(filters);
+
+    if (error) {
+      Alert.alert('Error', 'No se pudieron cargar los servicios');
+      setReports([]);
+    } else {
+      const transformedReports = (data || []).map(service => ({
+        id: service.id,
+        fecha: formatDateToString(new Date(service.assigned_date)),
+        servicio: service.service_name || 'Servicio',
+        ubicacion: service.location?.location || 'Sin ubicación',
+        telefono: service.phone || 'Sin teléfono',
+        estado: getStatusDisplayName(service.status),
+        cliente: service.user?.name || 'Sin asignar'
+      }));
+      setReports(transformedReports);
+    }
+  };
+
+  const toggleStatusSelection = (status) => {
+    setSelectedStatus(prev => {
+      if (prev.includes(status)) {
+        return prev.filter(s => s !== status);
+      } else {
+        return [...prev, status];
+      }
     });
-    setShowFiltersModal(false);
-    setShowFiltersPanel(false);
   };
 
-  const exportToCSV = async () => {
-    try {
-      if (filteredServices.length === 0) {
-        Alert.alert('Error', 'No hay datos para exportar');
-        return;
+  const toggleClientSelection = (client) => {
+    setSelectedClient(prev => {
+      if (prev.includes(client)) {
+        return prev.filter(c => c !== client);
+      } else {
+        return [...prev, client];
       }
+    });
+  };
 
-      // Crear encabezados CSV
-      const headers = ['Fecha', 'Servicio', 'Dirección', 'Teléfono', 'Estado'];
-      if (isAdmin()) {
-        headers.push('Cliente');
+  const toggleLocationSelection = (location) => {
+    setSelectedLocation(prev => {
+      if (prev.includes(location)) {
+        return prev.filter(l => l !== location);
+      } else {
+        return [...prev, location];
       }
-
-      // Crear filas de datos
-      const rows = filteredServices.map(service => {
-        const row = [
-          formatDate(service.assigned_date),
-          service.service_name || 'Servicio',
-          service.address || 'Sin dirección',
-          service.phone || 'Sin teléfono',
-          getStatusDisplayName(service.status)
-        ];
-        if (isAdmin()) {
-          row.push(service.user_name || 'Sin asignar');
-        }
-        return row;
-      });
-
-      // Combinar headers y rows
-      const csvContent = [headers, ...rows]
-        .map(row => row.map(cell => `"${cell}"`).join(','))
-        .join('\n');
-
-      // Compartir el archivo CSV
-      await Share.share({
-        message: csvContent,
-        title: 'Reporte de Servicios',
-      });
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo exportar el reporte');
-    }
+    });
   };
 
-  const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-    } catch {
-      return 'Fecha inválida';
-    }
-  };
+  const filteredReports = reports.filter(report => {
+    const matchesStatus = selectedStatus.length === 0 || selectedStatus.includes(report.estado);
+    const matchesClient = selectedClient.length === 0 || selectedClient.includes(report.cliente);
+    const matchesLocation = selectedLocation.length === 0 || selectedLocation.includes(report.ubicacion);
+    const matchesSearch = searchText === '' ||
+      report.servicio.toLowerCase().includes(searchText.toLowerCase()) ||
+      report.ubicacion.toLowerCase().includes(searchText.toLowerCase()) ||
+      report.cliente.toLowerCase().includes(searchText.toLowerCase());
+    return matchesStatus && matchesClient && matchesLocation && matchesSearch;
+  });
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case DATABASE_CONFIG.serviceStatus.PENDING:
-        return modernTheme.colors.warning;
-      case DATABASE_CONFIG.serviceStatus.CONFIRMED:
-        return modernTheme.colors.success;
-      case DATABASE_CONFIG.serviceStatus.CANCELLED:
-        return modernTheme.colors.error;
-      case DATABASE_CONFIG.serviceStatus.COMPLETED:
-        return modernTheme.colors.primary;
-      default:
-        return modernTheme.colors.text.muted;
-    }
+  const formatDate = (date) => {
+    return date.toLocaleDateString('es-ES');
   };
 
   const getStatusDisplayName = (status) => {
@@ -258,775 +173,645 @@ const ReportsScreen = () => {
     }
   };
 
-  const renderService = ({ item }) => (
-    <View style={styles.tableRow}>
-      <Text style={[styles.tableCell, styles.dateCell]}>{formatDate(item.assigned_date)}</Text>
-      <Text style={[styles.tableCell, styles.serviceCell]}>{item.service_name || 'Servicio'}</Text>
-      <Text style={[styles.tableCell, styles.addressCell]}>{item.address || 'Sin dirección'}</Text>
-      <Text style={[styles.tableCell, styles.phoneCell]}>{item.phone || 'Sin teléfono'}</Text>
-      <View style={[styles.tableCell, styles.statusCell]}>
-        <View style={[
-          styles.statusBadge,
-          { backgroundColor: getStatusColor(item.status) }
-        ]}>
-          <Text style={styles.statusBadgeText}>
-            {getStatusDisplayName(item.status)}
-          </Text>
+  const handleStartDateChange = (event, selectedDate) => {
+    setShowStartDatePicker(false);
+    if (selectedDate) {
+      setStartDate(selectedDate);
+    }
+  };
+
+  const handleEndDateChange = (event, selectedDate) => {
+    setShowEndDatePicker(false);
+    if (selectedDate) {
+      setEndDate(selectedDate);
+    }
+  };
+
+  const calculateSummary = () => {
+    const statusCounts = {};
+    Object.values(DATABASE_CONFIG.serviceStatus).forEach(status => {
+      statusCounts[status] = filteredReports.filter(r => r.estado === getStatusDisplayName(status)).length;
+    });
+
+    return {
+      totalServices: filteredReports.length,
+      pending: statusCounts[DATABASE_CONFIG.serviceStatus.PENDING] || 0,
+      confirmed: statusCounts[DATABASE_CONFIG.serviceStatus.CONFIRMED] || 0,
+      completed: statusCounts[DATABASE_CONFIG.serviceStatus.COMPLETED] || 0,
+      cancelled: statusCounts[DATABASE_CONFIG.serviceStatus.CANCELLED] || 0,
+    };
+  };
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const getSortedData = () => {
+    const sortedData = [...filteredReports];
+    sortedData.sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (a[sortConfig.key] > b[sortConfig.key]) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+    return sortedData;
+  };
+
+
+
+  const exportToExcel = async () => {
+    try {
+      const headers = ['ID', 'Fecha', 'Servicio', 'Ubicación', 'Teléfono', 'Estado'];
+      if (isAdmin()) headers.push('Cliente');
+
+      const data = filteredReports.map(report => {
+        const row = [report.id, report.fecha, report.servicio, report.ubicacion, report.telefono, report.estado];
+        if (isAdmin()) row.push(report.cliente);
+        return row;
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Reportes');
+
+      const wbout = XLSX.write(wb, { type: 'binary', bookType: 'xls' });
+
+      const pathExcel = Platform.OS === 'ios'
+        ? `${RNFS.DocumentDirectoryPath}/Reportes`
+        : `${RNFS.DownloadDirectoryPath}/Reportes`;
+
+      await RNFS.mkdir(pathExcel);
+      const fileNameExcel = `reporteServicios_${new Date().toISOString().split('T')[0]}`;
+      const filePathExcel = `${pathExcel}/${fileNameExcel}.xls`;
+
+      await RNFS.writeFile(filePathExcel, wbout, 'ascii');
+      await Share.share({
+        url: `file://${filePathExcel}`,
+        type: 'application/vnd.ms-excel',
+        title: 'Abrir Excel',
+      });
+      await RNFS.unlink(filePathExcel);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      Alert.alert('Error', 'No se pudo exportar el reporte: ' + error.message);
+    }
+  };
+
+const exportToPDF = async () => {
+  try {
+    const headers = ['ID', 'Fecha', 'Servicio', 'Ubicación', 'Teléfono', 'Estado'];
+    if (isAdmin()) headers.push('Cliente');
+    const data = filteredReports.map(report => {
+      const row = [report.id, report.fecha, report.servicio, report.ubicacion, report.telefono, report.estado];
+      if (isAdmin()) row.push(report.cliente);
+      return row;
+    });
+    const html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; }
+            h1 { text-align: center; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+          </style>
+        </head>
+        <body>
+          <h1>Reporte de Servicios</h1>
+          <table>
+            <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+            ${data.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+          </table>
+        </body>
+      </html>
+    `;
+    const options = {
+      html,
+      fileName: `reporteServicios_${new Date().toISOString().split('T')[0]}`,
+      directory: Platform.OS === 'ios' ? RNFS.DocumentDirectoryPath : RNFS.DownloadDirectoryPath,
+    };
+    const file = await RNHTMLtoPDF.convert(options);
+    await Share.share({
+      url: `file://${file.filePath}`,
+      type: 'application/pdf',
+      title: 'Abrir PDF',
+    });
+    await RNFS.unlink(file.filePath);
+  } catch (error) {
+    console.error('Error al exportar PDF:', error);
+    Alert.alert('Error', 'No se pudo exportar el reporte PDF: ' + error.message);
+  }
+};
+
+const handleExport = () => {
+  setShowFormatModal(true);
+};
+
+// Cambiar exportToXML a exportToExcel en cualquier referencia
+
+  const renderSummary = () => {
+    const summary = calculateSummary();
+    return (
+      <View style={styles.summaryContainer}>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryIconContainer}>
+            <MaterialIcons name="list" size={16} color={modernTheme.colors.primary} />
+          </View>
+          <View style={styles.summaryTextContainer}>
+            <Text style={styles.summaryNumber}>{summary.totalServices}</Text>
+            <Text style={styles.summaryLabel}>Servicios</Text>
+          </View>
+        </View>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryIconContainer}>
+            <MaterialIcons name="schedule" size={16} color={modernTheme.colors.warning} />
+          </View>
+          <View style={styles.summaryTextContainer}>
+            <Text style={styles.summaryNumber}>{summary.pending}</Text>
+            <Text style={styles.summaryLabel}>Pendientes</Text>
+          </View>
+        </View>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryIconContainer}>
+            <MaterialIcons name="check-circle" size={16} color={modernTheme.colors.success} />
+          </View>
+          <View style={styles.summaryTextContainer}>
+            <Text style={styles.summaryNumber}>{summary.confirmed}</Text>
+            <Text style={styles.summaryLabel}>Confirmados</Text>
+          </View>
+        </View>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryIconContainer}>
+            <MaterialIcons name="done" size={16} color={modernTheme.colors.primary} />
+          </View>
+          <View style={styles.summaryTextContainer}>
+            <Text style={styles.summaryNumber}>{summary.completed}</Text>
+            <Text style={styles.summaryLabel}>Completados</Text>
+          </View>
         </View>
       </View>
-      {isAdmin() && (
-        <Text style={[styles.tableCell, styles.userCell]}>{item.user_name || 'Sin asignar'}</Text>
+    );
+  };
+
+  const columnWidths = isAdmin() ? [10, 12, 18, 15, 15, 12, 18] : [15, 12, 18, 15, 15, 25];
+  const columnHeaders = isAdmin() ? ['ID', 'Fecha', 'Servicio', 'Ubicación', 'Teléfono', 'Estado', 'Cliente'] : ['ID', 'Fecha', 'Servicio', 'Ubicación', 'Teléfono', 'Estado'];
+  const sortKeys = isAdmin() ? ['id', 'fecha', 'servicio', 'ubicacion', 'telefono', 'estado', 'cliente'] : ['id', 'fecha', 'servicio', 'ubicacion', 'telefono', 'estado'];
+  const rowKeys = isAdmin() ? ['id', 'fecha', 'servicio', 'ubicacion', 'telefono', 'estado', 'cliente'] : ['id', 'fecha', 'servicio', 'ubicacion', 'telefono', 'estado'];
+
+  const renderTableHeader = () => (
+    <View style={styles.tableHeader}>
+      {columnWidths.map((percentage, index) => (
+        <TouchableOpacity key={index} style={[styles.headerCell, { width: (width * percentage / 100) * zoomLevel }]} onPress={() => handleSort(sortKeys[index])}>
+          <Text style={[styles.headerText, { fontSize: 8 * zoomLevel }]}>{columnHeaders[index]}</Text>
+          {sortConfig.key === sortKeys[index] && (
+            <MaterialIcons name={sortConfig.direction === 'asc' ? 'arrow-upward' : 'arrow-downward'} size={6 * zoomLevel} color={modernTheme.colors.text.inverse} />
+          )}
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const uniqueClients = [...new Set(reports.map(r => r.cliente).filter(c => c && c !== 'Sin asignar'))];
+  const uniqueLocations = [...new Set(reports.map(r => r.ubicacion).filter(l => l && l !== 'Sin ubicación'))];
+
+  const renderFilterOptions = () => (
+    <View style={styles.filterOptionsContainer}>
+      <View style={styles.filterButtonsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.filterScrollView}>
+          <View style={styles.filterButtonRow}>
+            <TouchableOpacity style={styles.filterButton} onPress={() => setShowStatusModal(true)}>
+              <MaterialIcons name="filter-list" size={16} color={modernTheme.colors.primary} />
+              <Text style={styles.filterButtonText}>
+                {selectedStatus.length > 0 ? `${selectedStatus.length} estado(s)` : 'Estados'}
+              </Text>
+            </TouchableOpacity>
+            {isAdmin() && (
+              <TouchableOpacity style={styles.filterButton} onPress={() => setShowClientModal(true)}>
+                <MaterialIcons name="person" size={16} color={modernTheme.colors.primary} />
+                <Text style={styles.filterButtonText}>
+                  {selectedClient.length > 0 ? `${selectedClient.length} cliente(s)` : 'Clientes'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.filterButton} onPress={() => setShowLocationModal(true)}>
+              <MaterialIcons name="location-on" size={16} color={modernTheme.colors.primary} />
+              <Text style={styles.filterButtonText}>
+                {selectedLocation.length > 0 ? `${selectedLocation.length} ubicación(es)` : 'Ubicaciones'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+      {(selectedStatus.length > 0 || selectedClient.length > 0 || selectedLocation.length > 0) && (
+        <View style={styles.excelFilterContainer}>
+          <View style={styles.excelFilterHeader}>
+            <MaterialIcons name="filter" size={16} color={modernTheme.colors.primary} />
+            <Text style={styles.excelFilterTitle}>Filtros Seleccionados</Text>
+          </View>
+          <View style={styles.excelFilterContent}>
+            <View style={styles.excelFilterValues}>
+              {selectedStatus.map((status, index) => (
+                <View key={`status-${index}`} style={styles.excelFilterTag}>
+                  <Text style={styles.excelFilterTagText}>{status}</Text>
+                  <TouchableOpacity onPress={() => toggleStatusSelection(status)} style={styles.excelFilterRemoveButton}>
+                    <MaterialIcons name="close" size={12} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {selectedClient.map((client, index) => (
+                <View key={`client-${index}`} style={styles.excelFilterTag}>
+                  <Text style={styles.excelFilterTagText}>{client}</Text>
+                  <TouchableOpacity onPress={() => toggleClientSelection(client)} style={styles.excelFilterRemoveButton}>
+                    <MaterialIcons name="close" size={12} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {selectedLocation.map((location, index) => (
+                <View key={`location-${index}`} style={styles.excelFilterTag}>
+                  <Text style={styles.excelFilterTagText}>{location}</Text>
+                  <TouchableOpacity onPress={() => toggleLocationSelection(location)} style={styles.excelFilterRemoveButton}>
+                    <MaterialIcons name="close" size={12} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
       )}
     </View>
   );
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          📊 {isAdmin() ? 'Reportes de Servicios' : 'Mis Reportes'}
-        </Text>
-        <Text style={styles.headerSubtitle}>
-          Bienvenido, {userName}
-        </Text>
-      </View>
-
-
-      {/* Barra de búsqueda compacta */}
-      <View style={styles.searchBar}>
-        <View style={styles.searchInputContainer}>
-          <MaterialIcons name="search" size={18} color={modernTheme.colors.text.secondary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar..."
-            value={searchText}
-            onChangeText={(text) => setSearchText(text)}
-            placeholderTextColor={modernTheme.colors.text.muted}
-          />
-          {searchText !== '' && (
-            <TouchableOpacity onPress={() => setSearchText('')}>
-              <MaterialIcons name="close" size={18} color={modernTheme.colors.text.secondary} />
+  const renderStatusModal = () => (
+    <Modal visible={showStatusModal} transparent={true} animationType="slide" onRequestClose={() => setShowStatusModal(false)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Seleccionar Estados</Text>
+            <TouchableOpacity onPress={() => setShowStatusModal(false)}>
+              <MaterialIcons name="close" size={24} color={modernTheme.colors.text.primary} />
             </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFiltersPanel(!showFiltersPanel)}
-        >
-          <MaterialIcons
-            name="tune"
-            size={20}
-            color={showFiltersPanel ? modernTheme.colors.primary : modernTheme.colors.text.secondary}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Panel de filtros expandible */}
-      {showFiltersPanel && (
-        <View style={styles.filterPanel}>
-          <View style={styles.filterSection}>
-            <Text style={styles.filterSectionTitle}>Estado</Text>
-            <View style={styles.filterOptions}>
-              <TouchableOpacity
-                style={[styles.filterOption, selectedStatus === null && styles.filterOptionSelected]}
-                onPress={() => setSelectedStatus(null)}
-              >
-                <Text style={[styles.filterOptionText, selectedStatus === null && styles.filterOptionTextSelected]}>
-                  Todos
-                </Text>
-              </TouchableOpacity>
-              {Object.values(DATABASE_CONFIG.serviceStatus).map((status) => (
-                <TouchableOpacity
-                  key={status}
-                  style={[styles.filterOption, selectedStatus === status && styles.filterOptionSelected]}
-                  onPress={() => setSelectedStatus(status)}
-                >
-                  <Text style={[styles.filterOptionText, selectedStatus === status && styles.filterOptionTextSelected]}>
-                    {getStatusDisplayName(status)} ({statusCounts[status] || 0})
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
-
-          <View style={styles.filterSection}>
-            <Text style={styles.filterSectionTitle}>Rango de Fechas</Text>
-            <View style={styles.dateRangeContainer}>
-              <View style={styles.dateInputContainer}>
-                <Text style={styles.dateLabel}>Desde:</Text>
-                <TouchableOpacity
-                  onPress={() => setShowDateFromPicker(true)}
-                  style={[styles.dateInput, { justifyContent: 'center' }]}
-                >
-                  <Text style={{
-                    color: filters.date_from ? modernTheme.colors.text.primary : modernTheme.colors.text.muted,
-                    fontSize: 14
-                  }}>
-                    {filters.date_from || 'Seleccionar fecha'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.dateInputContainer}>
-                <Text style={styles.dateLabel}>Hasta:</Text>
-                <TouchableOpacity
-                  onPress={() => setShowDateToPicker(true)}
-                  style={[styles.dateInput, { justifyContent: 'center' }]}
-                >
-                  <Text style={{
-                    color: filters.date_to ? modernTheme.colors.text.primary : modernTheme.colors.text.muted,
-                    fontSize: 14
-                  }}>
-                    {filters.date_to || 'Seleccionar fecha'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.filterSection}>
-            <Text style={styles.filterSectionTitle}>Buscar por</Text>
-            <View style={styles.searchTypeOptions}>
-              <TouchableOpacity
-                style={[styles.searchTypeOption, searchType === 'service_name' && styles.searchTypeOptionSelected]}
-                onPress={() => setSearchType('service_name')}
-              >
-                <MaterialIcons
-                  name="cleaning-services"
-                  size={16}
-                  color={searchType === 'service_name' ? modernTheme.colors.primary : modernTheme.colors.text.secondary}
-                />
-                <Text style={[styles.searchTypeOptionText, searchType === 'service_name' && styles.searchTypeOptionTextSelected]}>
-                  Servicio
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.searchTypeOption, searchType === 'address' && styles.searchTypeOptionSelected]}
-                onPress={() => setSearchType('address')}
-              >
-                <MaterialIcons
-                  name="location-on"
-                  size={16}
-                  color={searchType === 'address' ? modernTheme.colors.primary : modernTheme.colors.text.secondary}
-                />
-                <Text style={[styles.searchTypeOptionText, searchType === 'address' && styles.searchTypeOptionTextSelected]}>
-                  Dirección
-                </Text>
-              </TouchableOpacity>
-              {isAdmin() && (
-                <TouchableOpacity
-                  style={[styles.searchTypeOption, searchType === 'user' && styles.searchTypeOptionSelected]}
-                  onPress={() => setSearchType('user')}
-                >
-                  <MaterialIcons
-                    name="person"
-                    size={16}
-                    color={searchType === 'user' ? modernTheme.colors.primary : modernTheme.colors.text.secondary}
-                  />
-                  <Text style={[styles.searchTypeOptionText, searchType === 'user' && styles.searchTypeOptionTextSelected]}>
-                    Cliente
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-
-          {(selectedStatus !== null || searchText !== '') && (
-            <TouchableOpacity
-              style={styles.clearFiltersButton}
-              onPress={clearFilters}
-            >
-              <MaterialIcons name="clear-all" size={16} color={modernTheme.colors.error} />
-              <Text style={styles.clearFiltersText}>Limpiar filtros</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      <View style={styles.content}>
-        <View style={styles.resultsHeader}>
-          <Text style={styles.resultsText}>
-            {filteredServices.length} de {services.length} servicios
-          </Text>
-          <TouchableOpacity
-            style={styles.downloadButton}
-            onPress={exportToCSV}
-          >
-            <MaterialIcons name="download" size={20} color={modernTheme.colors.primary} />
-            <Text style={styles.downloadButtonText}>Exportar CSV</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Table Header */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableHeaderCell, styles.dateCell]}>Fecha</Text>
-          <Text style={[styles.tableHeaderCell, styles.serviceCell]}>Servicio</Text>
-          <Text style={[styles.tableHeaderCell, styles.addressCell]}>Dirección</Text>
-          <Text style={[styles.tableHeaderCell, styles.phoneCell]}>Teléfono</Text>
-          <Text style={[styles.tableHeaderCell, styles.statusCell]}>Estado</Text>
-          {isAdmin() && (
-            <Text style={[styles.tableHeaderCell, styles.userCell]}>Cliente</Text>
-          )}
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={modernTheme.colors.primary} />
-            <Text style={styles.loadingText}>Cargando reportes...</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredServices}
-            renderItem={renderService}
-            keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-            contentContainerStyle={styles.listContainer}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <MaterialIcons
-                  name="analytics"
-                  size={40}
-                  color={modernTheme.colors.text.muted}
-                  style={styles.emptyIcon}
-                />
-                <Text style={styles.emptyText}>
-                  {services.length === 0 ? 'No hay servicios registrados' : 'No hay servicios que coincidan con los filtros'}
-                </Text>
-                <Text style={styles.emptySubtext}>
-                  {services.length === 0 ? 'Los servicios aparecerán aquí cuando sean creados' : 'Intenta cambiar los filtros'}
-                </Text>
-              </View>
-            }
-          />
-        )}
-      </View>
-
-      {/* Modal de Filtros */}
-      <Modal
-        visible={showFiltersModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowFiltersModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Filtros de Reporte</Text>
-
-            <ScrollView style={styles.filtersScroll}>
-              {/* Filtro por estado */}
-              <Text style={styles.filterLabel}>Estado:</Text>
-              <View style={styles.statusFilterContainer}>
-                {Object.values(DATABASE_CONFIG.serviceStatus).map((status) => (
-                  <TouchableOpacity
-                    key={status}
-                    style={[
-                      styles.statusFilterOption,
-                      filters.status === status && styles.statusFilterOptionSelected
-                    ]}
-                    onPress={() => setFilters(prev => ({
-                      ...prev,
-                      status: prev.status === status ? '' : status
-                    }))}
-                  >
-                    <Text style={[
-                      styles.statusFilterOptionText,
-                      filters.status === status && styles.statusFilterOptionTextSelected
-                    ]}>
-                      {getStatusDisplayName(status)}
-                    </Text>
-                  </TouchableOpacity>
+          <View style={styles.selectedItemsContainer}>
+            {selectedStatus.length > 0 && (
+              <View style={styles.selectedItemsList}>
+                {selectedStatus.map((status, index) => (
+                  <View key={index} style={styles.selectedItemTag}>
+                    <Text style={styles.selectedItemText}>{status}</Text>
+                    <TouchableOpacity onPress={() => toggleStatusSelection(status)} style={styles.removeItemButton}>
+                      <MaterialIcons name="close" size={14} color={modernTheme.colors.text.inverse} />
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </View>
-
-              {/* Filtro por tipo de servicio */}
-              <Text style={styles.filterLabel}>Tipo de Servicio:</Text>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="Buscar por nombre del servicio"
-                value={filters.service_type}
-                onChangeText={(text) => setFilters(prev => ({ ...prev, service_type: text }))}
-              />
-
-              {/* Filtro por fecha desde */}
-              <Text style={styles.filterLabel}>Fecha Desde:</Text>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="YYYY-MM-DD"
-                value={filters.date_from}
-                onChangeText={(text) => setFilters(prev => ({ ...prev, date_from: text }))}
-              />
-
-              {/* Filtro por fecha hasta */}
-              <Text style={styles.filterLabel}>Fecha Hasta:</Text>
-              <TextInput
-                style={styles.filterInput}
-                placeholder="YYYY-MM-DD"
-                value={filters.date_to}
-                onChangeText={(text) => setFilters(prev => ({ ...prev, date_to: text }))}
-              />
-
-              {/* Filtro por usuario (solo admin) */}
-              {isAdmin() && (
-                <>
-                  <Text style={styles.filterLabel}>ID de Usuario:</Text>
-                  <TextInput
-                    style={styles.filterInput}
-                    placeholder="ID del usuario"
-                    value={filters.user_id}
-                    onChangeText={(text) => setFilters(prev => ({ ...prev, user_id: text }))}
-                  />
-                </>
-              )}
-            </ScrollView>
-
-            <View style={styles.modalButtons}>
+            )}
+          </View>
+          <ScrollView style={styles.modalList}>
+            {Object.values(DATABASE_CONFIG.serviceStatus).map((status, index) => (
               <TouchableOpacity
-                style={[styles.modalButton, styles.clearButton]}
-                onPress={clearFilters}
+                key={index}
+                style={[styles.modalItem, selectedStatus.includes(getStatusDisplayName(status)) && styles.selectedItem]}
+                onPress={() => toggleStatusSelection(getStatusDisplayName(status))}
               >
-                <Text style={styles.clearButtonText}>Limpiar</Text>
+                <Text style={styles.modalItemText}>{getStatusDisplayName(status)}</Text>
+                {selectedStatus.includes(getStatusDisplayName(status)) && <MaterialIcons name="check" size={20} color={modernTheme.colors.primary} />}
               </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
 
+  const renderClientModal = () => (
+    <Modal visible={showClientModal} transparent={true} animationType="slide" onRequestClose={() => setShowClientModal(false)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Seleccionar Clientes</Text>
+            <TouchableOpacity onPress={() => setShowClientModal(false)}>
+              <MaterialIcons name="close" size={24} color={modernTheme.colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.selectedItemsContainer}>
+            {selectedClient.length > 0 && (
+              <View style={styles.selectedItemsList}>
+                {selectedClient.map((client, index) => (
+                  <View key={index} style={styles.selectedItemTag}>
+                    <Text style={styles.selectedItemText}>{client}</Text>
+                    <TouchableOpacity onPress={() => toggleClientSelection(client)} style={styles.removeItemButton}>
+                      <MaterialIcons name="close" size={14} color={modernTheme.colors.text.inverse} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+          <ScrollView style={styles.modalList}>
+            {uniqueClients.map((client, index) => (
               <TouchableOpacity
-                style={[styles.modalButton, styles.applyButton]}
-                onPress={() => setShowFiltersModal(false)}
+                key={index}
+                style={[styles.modalItem, selectedClient.includes(client) && styles.selectedItem]}
+                onPress={() => toggleClientSelection(client)}
               >
-                <Text style={styles.applyButtonText}>Aplicar</Text>
+                <Text style={styles.modalItemText}>{client}</Text>
+                {selectedClient.includes(client) && <MaterialIcons name="check" size={20} color={modernTheme.colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderLocationModal = () => (
+    <Modal visible={showLocationModal} transparent={true} animationType="slide" onRequestClose={() => setShowLocationModal(false)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Seleccionar Ubicaciones</Text>
+            <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+              <MaterialIcons name="close" size={24} color={modernTheme.colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.selectedItemsContainer}>
+            {selectedLocation.length > 0 && (
+              <View style={styles.selectedItemsList}>
+                {selectedLocation.map((location, index) => (
+                  <View key={index} style={styles.selectedItemTag}>
+                    <Text style={styles.selectedItemText}>{location}</Text>
+                    <TouchableOpacity onPress={() => toggleLocationSelection(location)} style={styles.removeItemButton}>
+                      <MaterialIcons name="close" size={14} color={modernTheme.colors.text.inverse} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+          <ScrollView style={styles.modalList}>
+            {uniqueLocations.map((location, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.modalItem, selectedLocation.includes(location) && styles.selectedItem]}
+                onPress={() => toggleLocationSelection(location)}
+              >
+                <Text style={styles.modalItemText}>{location}</Text>
+                {selectedLocation.includes(location) && <MaterialIcons name="check" size={20} color={modernTheme.colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderFormatModal = () => (
+    <Modal visible={showFormatModal} transparent={true} animationType="slide" onRequestClose={() => setShowFormatModal(false)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Seleccionar Formato de Exportación</Text>
+            <TouchableOpacity onPress={() => setShowFormatModal(false)}>
+              <MaterialIcons name="close" size={24} color={modernTheme.colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalList}>
+            <TouchableOpacity style={styles.modalItem} onPress={() => { setShowFormatModal(false); exportToExcel(); }}>
+              <Text style={styles.modalItemText}>Exportar como Excel</Text>
+              <MaterialIcons name="table-chart" size={20} color={modernTheme.colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalItem} onPress={() => { setShowFormatModal(false); exportToPDF(); }}>
+              <Text style={styles.modalItemText}>Exportar como PDF</Text>
+              <MaterialIcons name="picture-as-pdf" size={20} color={modernTheme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderTableRow = ({ item }) => (
+    <View style={styles.tableRow}>
+      {columnWidths.map((percentage, index) => (
+        <View key={index} style={[styles.cell, { width: (width * percentage / 100) * zoomLevel }]}>
+          <Text style={[styles.cellText, { fontSize: 8 * zoomLevel }]} numberOfLines={index === 2 || index === 3 ? 2 : 1}>{item[rowKeys[index]]}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  return (
+    <View style={styles.background}>
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={24} color={modernTheme.colors.text.inverse} />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <MaterialIcons name="analytics" size={30} color={modernTheme.colors.text.inverse} />
+            <Text style={styles.headerTitle}>Reportes</Text>
+          </View>
+          <TouchableOpacity style={styles.zoomButton} onPress={() => setZoomLevel(zoomLevel === 1 ? 1.5 : 1)}>
+            <MaterialIcons name="zoom-in" size={24} color={modernTheme.colors.text.inverse} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+            <MaterialIcons name="download" size={24} color={modernTheme.colors.text.inverse} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.filtersCard}>
+        <View style={styles.filtersContainer}>
+          <View style={styles.datePickersContainer}>
+            <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowStartDatePicker(true)}>
+              <MaterialIcons name="calendar-today" size={20} color={modernTheme.colors.primary} />
+              <Text style={styles.datePickerText}>Inicio: {formatDate(startDate)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowEndDatePicker(true)}>
+              <MaterialIcons name="calendar-today" size={20} color={modernTheme.colors.primary} />
+              <Text style={styles.datePickerText}>Fin: {formatDate(endDate)}</Text>
+            </TouchableOpacity>
+          </View>
+          {renderFilterOptions()}
+        </View>
+      </View>
+
+      {showSummary && renderSummary()}
+      <View style={styles.tableContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+          <View>
+            {renderTableHeader()}
+            <FlatList
+              data={getSortedData()}
+              renderItem={renderTableRow}
+              keyExtractor={item => item.id.toString()}
+              showsVerticalScrollIndicator={true}
+            />
+          </View>
+        </ScrollView>
+      </View>
+
+      {showStartDatePicker && (
+        <Modal visible={showStartDatePicker} transparent={true} animationType="slide" onRequestClose={() => setShowStartDatePicker(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.datePickerModalContent}>
+              <Text style={styles.modalTitle}>Seleccionar Fecha Desde</Text>
+              <Calendar
+                onDayPress={(day) => {
+                  const dateStr = day.dateString;
+                  setStartDate(new Date(day.year, day.month - 1, day.day));
+                  setShowStartDatePicker(false);
+                }}
+                markedDates={{
+                  [startDate.toISOString().split('T')[0]]: { selected: true, selectedColor: modernTheme.colors.primary }
+                }}
+              />
+              <TouchableOpacity
+                onPress={() => setShowStartDatePicker(false)}
+                style={styles.datePickerCloseButton}
+              >
+                <Text style={styles.datePickerCloseText}>Cancelar</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
-
-      {/* Date From Picker Modal */}
-      <Modal
-        visible={showDateFromPicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowDateFromPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.datePickerModalContent}>
-            <Text style={styles.modalTitle}>Seleccionar Fecha Desde</Text>
-            <Calendar
-              onDayPress={(day) => {
-                const dateStr = day.dateString;
-                setFilters(prev => ({ ...prev, date_from: dateStr }));
-                setSelectedDateFrom(new Date(day.year, day.month - 1, day.day));
-                setShowDateFromPicker(false);
-              }}
-              markedDates={{
-                [filters.date_from]: { selected: true, selectedColor: modernTheme.colors.primary }
-              }}
-            />
-            <TouchableOpacity
-              onPress={() => setShowDateFromPicker(false)}
-              style={styles.datePickerCloseButton}
-            >
-              <Text style={styles.datePickerCloseText}>Cancelar</Text>
-            </TouchableOpacity>
+        </Modal>
+      )}
+      {showEndDatePicker && (
+        <Modal visible={showEndDatePicker} transparent={true} animationType="slide" onRequestClose={() => setShowEndDatePicker(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.datePickerModalContent}>
+              <Text style={styles.modalTitle}>Seleccionar Fecha Hasta</Text>
+              <Calendar
+                onDayPress={(day) => {
+                  const dateStr = day.dateString;
+                  setEndDate(new Date(day.year, day.month - 1, day.day));
+                  setShowEndDatePicker(false);
+                }}
+                markedDates={{
+                  [endDate.toISOString().split('T')[0]]: { selected: true, selectedColor: modernTheme.colors.primary }
+                }}
+              />
+              <TouchableOpacity
+                onPress={() => setShowEndDatePicker(false)}
+                style={styles.datePickerCloseButton}
+              >
+                <Text style={styles.datePickerCloseText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
-      {/* Date To Picker Modal */}
-      <Modal
-        visible={showDateToPicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowDateToPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.datePickerModalContent}>
-            <Text style={styles.modalTitle}>Seleccionar Fecha Hasta</Text>
-            <Calendar
-              onDayPress={(day) => {
-                const dateStr = day.dateString;
-                setFilters(prev => ({ ...prev, date_to: dateStr }));
-                setSelectedDateTo(new Date(day.year, day.month - 1, day.day));
-                setShowDateToPicker(false);
-              }}
-              markedDates={{
-                [filters.date_to]: { selected: true, selectedColor: modernTheme.colors.primary }
-              }}
-            />
-            <TouchableOpacity
-              onPress={() => setShowDateToPicker(false)}
-              style={styles.datePickerCloseButton}
-            >
-              <Text style={styles.datePickerCloseText}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {renderStatusModal()}
+      {renderClientModal()}
+      {renderLocationModal()}
+      {renderFormatModal()}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  background: {
     flex: 1,
     backgroundColor: modernTheme.colors.background.secondary,
-  },
-  backButton: {
-    marginBottom: modernTheme.spacing.sm,
-    padding: modernTheme.spacing.xs,
-  },
-  backButtonText: {
-    color: modernTheme.colors.text.inverse,
-    ...modernTheme.typography.body,
-    fontWeight: '500',
   },
   header: {
+    height: 75,
+    justifyContent: 'flex-end',
+    paddingBottom: 20,
     backgroundColor: modernTheme.colors.primary,
-    padding: modernTheme.spacing.lg,
-    paddingTop: 50,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
   },
   headerTitle: {
-    ...modernTheme.typography.h2,
+    fontSize: 34,
+    fontWeight: '800',
     color: modernTheme.colors.text.inverse,
-    marginBottom: modernTheme.spacing.xs,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  headerSubtitle: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.text.inverse,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: modernTheme.spacing.lg,
-    paddingVertical: modernTheme.spacing.sm,
-    backgroundColor: modernTheme.colors.background.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: modernTheme.colors.border.primary,
-    gap: modernTheme.spacing.sm,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: modernTheme.colors.background.secondary,
-    borderRadius: modernTheme.borderRadius.md,
-    paddingHorizontal: modernTheme.spacing.md,
-    height: 40,
-    gap: modernTheme.spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: modernTheme.colors.text.primary,
-  },
-  filterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: modernTheme.borderRadius.md,
-    backgroundColor: modernTheme.colors.background.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterPanel: {
-    backgroundColor: modernTheme.colors.background.secondary,
-    paddingHorizontal: modernTheme.spacing.lg,
-    paddingVertical: modernTheme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: modernTheme.colors.border.primary,
-  },
-  filterSection: {
-    marginBottom: modernTheme.spacing.md,
-  },
-  filterSectionTitle: {
-    ...modernTheme.typography.label,
-    color: modernTheme.colors.text.primary,
-    marginBottom: modernTheme.spacing.sm,
-  },
-  filterOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: modernTheme.spacing.xs,
-  },
-  filterOption: {
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingVertical: modernTheme.spacing.xs,
-    borderRadius: modernTheme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: modernTheme.colors.border.primary,
-    backgroundColor: modernTheme.colors.background.primary,
-  },
-  filterOptionSelected: {
-    backgroundColor: modernTheme.colors.primary,
-    borderColor: modernTheme.colors.primary,
-  },
-  filterOptionText: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.text.secondary,
-  },
-  filterOptionTextSelected: {
-    color: modernTheme.colors.text.inverse,
-    fontWeight: '600',
-  },
-  searchTypeOptions: {
-    flexDirection: 'row',
-    gap: modernTheme.spacing.sm,
-  },
-  searchTypeOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: modernTheme.spacing.sm,
-    paddingHorizontal: modernTheme.spacing.md,
-    borderRadius: modernTheme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: modernTheme.colors.border.primary,
-    backgroundColor: modernTheme.colors.background.primary,
-    gap: modernTheme.spacing.xs,
-  },
-  searchTypeOptionSelected: {
-    backgroundColor: modernTheme.colors.primary,
-    borderColor: modernTheme.colors.primary,
-  },
-  searchTypeOptionText: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.text.secondary,
-  },
-  searchTypeOptionTextSelected: {
-    color: modernTheme.colors.text.inverse,
-    fontWeight: '600',
-  },
-  clearFiltersButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: modernTheme.spacing.xs,
-    paddingVertical: modernTheme.spacing.sm,
-    marginTop: modernTheme.spacing.sm,
-  },
-  clearFiltersText: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.error,
-    fontWeight: '600',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: modernTheme.spacing.lg,
-    paddingTop: modernTheme.spacing.sm,
-  },
-  resultsHeader: {
+  datePickersContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: modernTheme.spacing.sm,
+    marginHorizontal: 10,
   },
-  resultsText: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.text.secondary,
-  },
-  downloadButton: {
+  datePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: modernTheme.colors.background.secondary,
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingVertical: modernTheme.spacing.xs,
-    borderRadius: modernTheme.borderRadius.md,
-    gap: modernTheme.spacing.xs,
+    backgroundColor: modernTheme.colors.surface.primary,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    elevation: 2,
   },
-  downloadButtonText: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.primary,
-    fontWeight: '600',
-  },
-  dateRangeContainer: {
-    flexDirection: 'row',
-    gap: modernTheme.spacing.sm,
-  },
-  dateInputContainer: {
-    flex: 1,
-  },
-  dateLabel: {
-    ...modernTheme.typography.label,
+  datePickerText: {
+    marginLeft: 8,
+    fontSize: 16,
     color: modernTheme.colors.text.primary,
-    marginBottom: modernTheme.spacing.xs,
   },
-  dateInput: {
-    ...modernTheme.componentStyles.input,
-    paddingHorizontal: modernTheme.spacing.sm,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  filtersCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginVertical: 10,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
   filtersContainer: {
+    padding: 16,
+  },
+  filterButtonsContainer: {
+    marginVertical: 10,
+  },
+  filterScrollView: {
+    marginHorizontal: -4, // Para compensar padding
+  },
+  filterButtonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingRight: 20,
+  },
+  filterButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    ...modernTheme.componentStyles.card,
-    marginBottom: modernTheme.spacing.md,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: modernTheme.colors.primary,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minWidth: 100,
+    flexShrink: 1,
   },
-  filtersButton: {
-    ...modernTheme.componentStyles.button,
-    ...modernTheme.componentStyles.buttonPrimary,
-  },
-  filtersButtonText: {
-    ...modernTheme.typography.button,
-    color: modernTheme.colors.text.inverse,
-  },
-  resultsText: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.text.secondary,
+  filterButtonText: {
+    fontSize: 12,
+    color: modernTheme.colors.primary,
+    flex: 1,
     fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: modernTheme.spacing.sm,
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.text.secondary,
-  },
-  listContainer: {
-    paddingBottom: modernTheme.spacing.lg,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: modernTheme.colors.primary,
-    paddingVertical: modernTheme.spacing.sm,
-    paddingHorizontal: modernTheme.spacing.md,
-    marginBottom: modernTheme.spacing.xs,
-    borderRadius: modernTheme.borderRadius.md,
-  },
-  tableHeaderCell: {
-    ...modernTheme.typography.label,
-    color: modernTheme.colors.text.inverse,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    backgroundColor: modernTheme.colors.surface.primary,
-    paddingVertical: modernTheme.spacing.sm,
-    paddingHorizontal: modernTheme.spacing.md,
-    marginBottom: 1,
-    borderRadius: modernTheme.borderRadius.sm,
-    alignItems: 'center',
-  },
-  tableCell: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.text.primary,
-    textAlign: 'center',
-    paddingHorizontal: modernTheme.spacing.xs,
-  },
-  dateCell: {
-    flex: 1.2,
-    minWidth: 80,
-  },
-  serviceCell: {
-    flex: 2,
-    minWidth: 120,
-  },
-  addressCell: {
-    flex: 2.5,
-    minWidth: 150,
-  },
-  phoneCell: {
-    flex: 1.5,
-    minWidth: 100,
-  },
-  statusCell: {
-    flex: 1.5,
-    minWidth: 90,
-    alignItems: 'center',
-  },
-  userCell: {
-    flex: 1.5,
-    minWidth: 100,
-  },
-  serviceCard: {
-    ...modernTheme.componentStyles.card,
-    marginBottom: modernTheme.spacing.md,
-    borderLeftWidth: 4,
-    borderLeftColor: modernTheme.colors.primary,
-  },
-  serviceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: modernTheme.spacing.sm,
-  },
-  serviceName: {
-    ...modernTheme.typography.h4,
-    color: modernTheme.colors.text.primary,
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: modernTheme.spacing.sm,
-    paddingVertical: modernTheme.spacing.xs,
-    borderRadius: modernTheme.borderRadius.xl,
-  },
-  statusBadgeText: {
-    color: modernTheme.colors.text.inverse,
-    ...modernTheme.typography.caption,
-    fontWeight: '600',
-  },
-  serviceInfo: {
-    marginBottom: modernTheme.spacing.sm,
-  },
-  serviceDate: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.text.primary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  serviceAddress: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.text.secondary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  servicePhone: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.text.secondary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  serviceShift: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.text.secondary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  serviceHours: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.text.secondary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  serviceUser: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.text.secondary,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: modernTheme.spacing.xxxl,
-  },
-  emptyText: {
-    ...modernTheme.typography.h4,
-    color: modernTheme.colors.text.secondary,
-    fontWeight: '600',
-    marginBottom: modernTheme.spacing.sm,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.text.muted,
-    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -1036,80 +821,239 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: modernTheme.colors.surface.primary,
-    padding: modernTheme.spacing.lg,
-    margin: modernTheme.spacing.lg,
-    borderRadius: modernTheme.borderRadius.lg,
-    width: '90%',
-    maxWidth: 400,
+    borderRadius: 10,
+    width: '95%',
     maxHeight: '80%',
   },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: modernTheme.colors.border.primary,
+  },
   modalTitle: {
-    ...modernTheme.typography.h3,
-    color: modernTheme.colors.text.primary,
-    textAlign: 'center',
-    marginBottom: modernTheme.spacing.lg,
-  },
-  filtersScroll: {
-    maxHeight: 300,
-  },
-  filterLabel: {
-    ...modernTheme.typography.bodyLarge,
+    fontSize: 16,
     fontWeight: '600',
     color: modernTheme.colors.text.primary,
-    marginBottom: modernTheme.spacing.sm,
-    marginTop: modernTheme.spacing.md,
+    flex: 1,
   },
-  filterInput: {
-    ...modernTheme.componentStyles.input,
+  selectedItemsContainer: {
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: modernTheme.colors.border.primary,
   },
-  statusFilterContainer: {
+  selectedItemsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: modernTheme.spacing.sm,
+    gap: 6,
   },
-  statusFilterOption: {
-    paddingHorizontal: modernTheme.spacing.sm,
-    paddingVertical: modernTheme.spacing.xs,
-    borderRadius: modernTheme.borderRadius.xl,
-    borderWidth: 1,
-    borderColor: modernTheme.colors.border.primary,
-    marginRight: modernTheme.spacing.xs,
-    marginBottom: modernTheme.spacing.xs,
+  selectedItemTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: modernTheme.colors.primary,
+    borderRadius: 15,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    maxWidth: '100%',
   },
-  statusFilterOptionSelected: {
-    borderColor: modernTheme.colors.primary,
+  selectedItemText: {
+    color: modernTheme.colors.text.inverse,
+    fontSize: 12,
+    marginRight: 4,
+    flexShrink: 1,
+  },
+  removeItemButton: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalList: {
+    maxHeight: 300,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: modernTheme.colors.border.primary,
+  },
+  selectedItem: {
     backgroundColor: modernTheme.colors.background.tertiary,
   },
-  statusFilterOptionText: {
-    ...modernTheme.typography.bodySmall,
-    color: modernTheme.colors.text.secondary,
+  modalItemText: {
+    fontSize: 14,
+    color: modernTheme.colors.text.primary,
+    flex: 1,
   },
-  statusFilterOptionTextSelected: {
-    color: modernTheme.colors.primary,
-    fontWeight: '600',
+  tableContainer: {
+    flex: 1,
+    marginHorizontal: 0,
+    marginBottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 6,
+    elevation: 2,
+    height: '55%',
+    width: '100%',
   },
-  modalButtons: {
+  tableHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: modernTheme.spacing.lg,
+    backgroundColor: modernTheme.colors.primary,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    paddingVertical: 2,
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
   },
-  modalButton: {
-    ...modernTheme.componentStyles.button,
-    minWidth: 100,
+  headerCell: {
+    paddingHorizontal: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  clearButton: {
-    backgroundColor: modernTheme.colors.text.muted,
-  },
-  applyButton: {
-    ...modernTheme.componentStyles.buttonPrimary,
-  },
-  clearButtonText: {
-    ...modernTheme.typography.button,
+  headerText: {
     color: modernTheme.colors.text.inverse,
+    fontWeight: 'bold',
+    fontSize: 8,
+    textAlign: 'center',
   },
-  applyButtonText: {
-    ...modernTheme.typography.button,
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: modernTheme.colors.border.primary,
+    paddingVertical: 1,
+  },
+  cell: {
+    paddingHorizontal: 1,
+    justifyContent: 'center',
+  },
+  cellText: {
+    fontSize: 8,
+    color: modernTheme.colors.text.primary,
+    textAlign: 'center',
+  },
+  summaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    gap: 8,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 8,
+    padding: 8,
+    alignItems: 'center',
+    elevation: 2,
+    minWidth: 70,
+  },
+  summaryIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(210, 105, 30, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  summaryTextContainer: {
+    alignItems: 'center',
+  },
+  summaryNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: modernTheme.colors.text.primary,
+  },
+  summaryLabel: {
+    fontSize: 10,
+    color: modernTheme.colors.text.secondary,
+    textAlign: 'center',
+  },
+  filterOptionsContainer: {
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  excelFilterContainer: {
+    backgroundColor: modernTheme.colors.surface.primary,
+    borderRadius: 12,
+    marginBottom: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: modernTheme.colors.border.primary,
+    marginHorizontal: 4,
+  },
+  excelFilterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: modernTheme.colors.border.primary,
+    backgroundColor: modernTheme.colors.background.tertiary,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  excelFilterTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: modernTheme.colors.text.primary,
+    marginLeft: 6,
+  },
+  excelFilterContent: {
+    padding: 10,
+  },
+  excelFilterValues: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  excelFilterTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: modernTheme.colors.primary,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: modernTheme.colors.primary,
+    maxWidth: '100%',
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  excelFilterTagText: {
+    fontSize: 12,
     color: modernTheme.colors.text.inverse,
+    marginRight: 4,
+    flexShrink: 1,
+    fontWeight: '500',
+  },
+  excelFilterRemoveButton: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginRight: 8,
+  },
+  exportButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   datePickerModalContent: {
     backgroundColor: modernTheme.colors.surface.primary,
