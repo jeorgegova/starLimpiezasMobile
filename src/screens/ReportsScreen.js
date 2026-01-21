@@ -29,7 +29,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import RNFS from 'react-native-fs';
 import { Platform } from 'react-native';
 import * as XLSX from 'xlsx';
-import { convert } from 'react-native-html-to-pdf';
+import RNPrint from 'react-native-print';
 
 const { width } = Dimensions.get('window');
 
@@ -240,39 +240,44 @@ const ReportsScreen = () => {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Reportes');
 
-      const wbout = XLSX.write(wb, { type: 'binary', bookType: 'xls' });
+      const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
 
       const pathExcel = Platform.OS === 'ios'
         ? `${RNFS.DocumentDirectoryPath}/Reportes`
         : `${RNFS.DownloadDirectoryPath}/Reportes`;
 
-      await RNFS.mkdir(pathExcel);
-      const fileNameExcel = `reporteServicios_${new Date().toISOString().split('T')[0]}`;
-      const filePathExcel = `${pathExcel}/${fileNameExcel}.xls`;
+      const exists = await RNFS.exists(pathExcel);
+      if (!exists) {
+        await RNFS.mkdir(pathExcel);
+      }
 
-      await RNFS.writeFile(filePathExcel, wbout, 'ascii');
+      const fileNameExcel = `reporteServicios_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const filePathExcel = `${pathExcel}/${fileNameExcel}`;
+
+      await RNFS.writeFile(filePathExcel, wbout, 'base64');
       await Share.share({
         url: `file://${filePathExcel}`,
-        type: 'application/vnd.ms-excel',
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         title: 'Abrir Excel',
       });
-      await RNFS.unlink(filePathExcel);
+      // Optionally uncomment unlink if you want to delete after sharing
+      // await RNFS.unlink(filePathExcel);
     } catch (error) {
       console.error('Error al exportar Excel:', error);
       Alert.alert('Error', 'No se pudo exportar el reporte: ' + error.message);
     }
   };
 
-const exportToPDF = async () => {
-  try {
-    const headers = ['ID', 'Fecha', 'Servicio', 'Ubicación', 'Teléfono', 'Estado'];
-    if (isAdmin()) headers.push('Cliente');
-    const data = filteredReports.map(report => {
-      const row = [report.id, report.fecha, report.servicio, report.ubicacion, report.telefono, report.estado];
-      if (isAdmin()) row.push(report.cliente);
-      return row;
-    });
-    const html = `
+  const exportToPDF = async () => {
+    try {
+      const headers = ['ID', 'Fecha', 'Servicio', 'Ubicación', 'Teléfono', 'Estado'];
+      if (isAdmin()) headers.push('Cliente');
+      const data = filteredReports.map(report => {
+        const row = [report.id, report.fecha, report.servicio, report.ubicacion, report.telefono, report.estado];
+        if (isAdmin()) row.push(report.cliente);
+        return row;
+      });
+      const html = `
       <html>
         <head>
           <style>
@@ -292,29 +297,18 @@ const exportToPDF = async () => {
         </body>
       </html>
     `;
-    const options = {
-      html,
-      fileName: `reporteServicios_${new Date().toISOString().split('T')[0]}`,
-      directory: Platform.OS === 'ios' ? RNFS.DocumentDirectoryPath : RNFS.DownloadDirectoryPath,
-    };
-    const file = await RNHTMLtoPDF.convert(options);
-    await Share.share({
-      url: `file://${file.filePath}`,
-      type: 'application/pdf',
-      title: 'Abrir PDF',
-    });
-    await RNFS.unlink(file.filePath);
-  } catch (error) {
-    console.error('Error al exportar PDF:', error);
-    Alert.alert('Error', 'No se pudo exportar el reporte PDF: ' + error.message);
-  }
-};
+      await RNPrint.print({ html });
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      Alert.alert('Error', 'No se pudo exportar el reporte PDF: ' + error.message);
+    }
+  };
 
-const handleExport = () => {
-  setShowFormatModal(true);
-};
+  const handleExport = () => {
+    setShowFormatModal(true);
+  };
 
-// Cambiar exportToXML a exportToExcel en cualquier referencia
+  // Cambiar exportToXML a exportToExcel en cualquier referencia
 
   const renderSummary = () => {
     const summary = calculateSummary();
