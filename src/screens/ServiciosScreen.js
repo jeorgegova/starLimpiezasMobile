@@ -321,6 +321,23 @@ const ServiciosScreen = () => {
   const getStatusDisplayName = (status) => utilityService.getStatusDisplayName(status);
   const getShiftDisplayName = (shift) => utilityService.getShiftDisplayName(shift);
 
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'Pendiente';
+      case 'confirmed':
+        return 'Confirmado';
+      case 'in_progress':
+        return 'En Progreso';
+      case 'completed':
+        return 'Completado';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return 'Desconocido';
+    }
+  };
+
   // Contar servicios por estado
   const statusCounts = useMemo(() => {
     const counts = {};
@@ -339,6 +356,8 @@ const ServiciosScreen = () => {
           return modernTheme.colors.success || '#C8E6C9'; // Very soft green
         case DATABASE_CONFIG.serviceStatus.CANCELLED:
           return modernTheme.colors.error || '#FFCDD2'; // Very soft red
+        case DATABASE_CONFIG.serviceStatus.COMPLETED:
+          return modernTheme.colors.success || '#C8E6C9'; // Green for completed
         default:
           return modernTheme.colors.primary;
       }
@@ -367,7 +386,10 @@ const ServiciosScreen = () => {
             <MaterialIcons name="cleaning-services" size={20} color={modernTheme.colors.primary} />
             <Text style={styles.servicioNombre}>{item.service_name || 'Servicio'}</Text>
           </View>
-          <StatusIcon status={item.status} size="sm" />
+          <View style={styles.statusContainer}>
+            <StatusIcon status={item.status} size="sm" />
+            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          </View>
         </View>
 
         {isAdmin() && item.user && (
@@ -414,9 +436,13 @@ const ServiciosScreen = () => {
                 {item.hours && (
                   <View style={styles.infoRow}>
                     <MaterialIcons name="access-time" size={16} color={modernTheme.colors.text.secondary} />
-                    <Text style={styles.servicioText}>{item.hours}</Text>
+                    <Text style={styles.servicioText}>{item.hours} horas</Text>
                   </View>
                 )}
+                <View style={styles.infoRow}>
+                  <MaterialIcons name="attach-money" size={16} color={modernTheme.colors.text.secondary} />
+                  <Text style={styles.servicioText}>${item.price || item.cost || 'Por definir'}</Text>
+                </View>
               </View>
               <View style={styles.infoSection}>
                 {item.location && (
@@ -449,7 +475,7 @@ const ServiciosScreen = () => {
                 onPress={() => handleServiceAction(item, 'cancel')}
                 style={styles.actionButton}
               />
-              {(item.user_id === userProfile?.id || isAdmin()) && (
+              {isAdmin() && (item.user_id === userProfile?.id || isAdmin()) && (
                 <IconButton
                   icon="edit"
                   text="Editar"
@@ -471,7 +497,7 @@ const ServiciosScreen = () => {
                 onPress={() => handleServiceAction(item, 'complete')}
                 style={styles.actionButton}
               />
-              {(item.user_id === userProfile?.id || isAdmin()) && (
+              {isAdmin() && (item.user_id === userProfile?.id || isAdmin()) && (
                 <IconButton
                   icon="edit"
                   text="Editar"
@@ -483,7 +509,7 @@ const ServiciosScreen = () => {
               )}
             </View>
           )}
-          {(!isAdmin() || !hasPermission('canConfirmServices')) && (item.user_id === userProfile?.id || isAdmin()) && item.status !== DATABASE_CONFIG.serviceStatus.PENDING && item.status !== DATABASE_CONFIG.serviceStatus.CONFIRMED && (
+          {isAdmin() && (!hasPermission('canConfirmServices') || item.status !== DATABASE_CONFIG.serviceStatus.PENDING && item.status !== DATABASE_CONFIG.serviceStatus.CONFIRMED) && (item.user_id === userProfile?.id || isAdmin()) && (
             <IconButton
               icon="edit"
               text="Editar"
@@ -1146,6 +1172,15 @@ const styles = StyleSheet.create({
     ...modernTheme.typography.h4,
     color: modernTheme.colors.text.primary,
     flex: 1,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginLeft: modernTheme.spacing.xs,
   },
   servicioInfoContainer: {
     marginBottom: modernTheme.spacing.sm,

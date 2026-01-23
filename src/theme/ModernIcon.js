@@ -261,8 +261,8 @@ export const StatusIcon = ({
       case 'completed':
         return {
           icon: 'complete',
-          color: modernTheme.colors.primary,
-          backgroundColor: modernTheme.colors.primaryLight + '20'
+          color: modernTheme.colors.success,
+          backgroundColor: modernTheme.colors.success + '20'
         };
       default:
         return {

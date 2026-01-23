@@ -21,6 +21,7 @@ import { serviceService, utilityService } from '../services';
 import { modernTheme } from '../theme/ModernTheme';
 // import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { IconButton, StatusIcon } from '../theme/ModernIcon';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -37,7 +38,8 @@ const HomeScreen = () => {
   const [stats, setStats] = useState({
     servicios_activos: 0,
     clientes: 0,
-    servicios_pendientes: 0
+    servicios_pendientes: 0,
+    servicios_completados: 0
   });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,30 +72,45 @@ const HomeScreen = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Get statistics using utilityService
-      const { data: statsData, error } = await utilityService.getDashboardStats();
+      // For users, always use personal stats; for admins, use global stats
+      if (userRole === 'admin') {
+        const { data: statsData, error } = await utilityService.getDashboardStats();
 
-      if (error) {
-        console.error('Error loading dashboard stats:', error);
-        // Fallback: get basic services
-        const { data: servicesData } = await serviceService.getUserServices(null, true);
+        if (error) {
+          console.error('Error loading dashboard stats:', error);
+          // Fallback for admin
+          setStats({
+            servicios_activos: 0,
+            clientes: 0,
+            servicios_pendientes: 0,
+            servicios_completados: 0
+          });
+        } else {
+          setStats({
+            servicios_activos: statsData.servicesByStatus?.confirmed || 0,
+            clientes: statsData.usersByRole?.user || 0,
+            servicios_pendientes: statsData.servicesByStatus?.pending || 0,
+            servicios_completados: statsData.servicesByStatus?.completed || 0
+          });
+        }
+      } else {
+        // For users, get personal service stats
+        const { data: servicesData } = await serviceService.getUserServices(user?.id, false);
         setStats({
           servicios_activos: servicesData?.filter(s => s.status === 'confirmed').length || 0,
-          clientes: 0, // Placeholder - would need user count with role 'user'
-          servicios_pendientes: servicesData?.filter(s => s.status === 'pending').length || 0
+          clientes: 0,
+          servicios_pendientes: servicesData?.filter(s => s.status === 'pending').length || 0,
+          servicios_completados: servicesData?.filter(s => s.status === 'completed').length || 0
         });
-        setServicios(servicesData?.slice(0, 3) || []);
-      } else {
-        setStats({
-          servicios_activos: statsData.servicesByStatus?.confirmed || 0,
-          clientes: statsData.usersByRole?.user || 0,
-          servicios_pendientes: statsData.servicesByStatus?.pending || 0
-        });
-
-        // Get recent services
-        const { data: servicesData } = await serviceService.getUserServices(null, true);
-        setServicios(servicesData?.slice(0, 3) || []);
       }
+
+      // Get recent services (filtered for user role)
+      const { data: servicesData } = await serviceService.getUserServices(user?.id, userRole === 'admin');
+      // Filter out cancelled and completed services
+      const filteredServices = servicesData?.filter(service =>
+        service.status !== 'cancelled' && service.status !== 'completed'
+      ) || [];
+      setServicios(filteredServices.slice(0, 3));
 
     } catch (error) {
       Alert.alert('Error', 'No se pudieron cargar los datos del dashboard');
@@ -127,6 +144,23 @@ const HomeScreen = () => {
 
   const navigateToScreen = (screenName) => {
     navigation.navigate(screenName);
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'Pendiente';
+      case 'confirmed':
+        return 'Confirmado';
+      case 'in_progress':
+        return 'En Progreso';
+      case 'completed':
+        return 'Completado';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return 'Desconocido';
+    }
   };
 
   const menuItems = userRole === 'admin' ? [
@@ -252,42 +286,48 @@ const HomeScreen = () => {
             {
               backgroundColor: modernTheme.colors.warning + '15',
               borderLeftColor: modernTheme.colors.warning,
-              padding: 16
+              padding: 12
             }
           ]} onPress={() => navigateToScreen('Servicios')} activeOpacity={0.8}>
             <Text style={[styles.statIcon, { color: modernTheme.colors.warning }]}>⏳</Text>
             <Text style={styles.statNumber}>{stats.servicios_pendientes}</Text>
-            <Text style={styles.statLabel}>Servicios Sin{"\n"}Confirmar</Text>
+            <Text style={styles.statLabel}>Servicios Pendientes</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[
             styles.statCard,
             {
               backgroundColor: modernTheme.colors.secondary + '15',
-              borderLeftColor: modernTheme.colors.secondary
+              borderLeftColor: modernTheme.colors.secondary,
+              padding: 12
             }
           ]} onPress={() => navigateToScreen('Servicios')} activeOpacity={0.8}>
             <Text style={[styles.statIcon, { color: modernTheme.colors.secondary }]}>🧹</Text>
             <Text style={styles.statNumber}>{stats.servicios_activos}</Text>
-            <Text style={styles.statLabel}>Servicios Activos</Text>
+            <Text style={styles.statLabel}>Servicios Confirmados</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={[
             styles.statCard,
             {
-              backgroundColor: modernTheme.colors.primaryLight + '15',
-              borderLeftColor: modernTheme.colors.primary
+              backgroundColor: userRole === 'admin' ? modernTheme.colors.primaryLight + '15' : modernTheme.colors.success + '15',
+              borderLeftColor: userRole === 'admin' ? modernTheme.colors.primary : modernTheme.colors.success,
+              padding: 12
             }
-          ]} onPress={() => navigateToScreen('Clientes')} activeOpacity={0.8}>
-            <Text style={[styles.statIcon, { color: modernTheme.colors.secondaryLight }]}>👥</Text>
-            <Text style={styles.statNumber}>{stats.clientes}</Text>
-            <Text style={styles.statLabel}>Clientes</Text>
+          ]} onPress={() => userRole === 'admin' ? navigateToScreen('Clientes') : navigateToScreen('Servicios')} activeOpacity={0.8}>
+            {userRole === 'admin' ? (
+              <MaterialIcons name="people" size={28} color={modernTheme.colors.secondaryLight} />
+            ) : (
+              <MaterialIcons name="check-circle" size={28} color={modernTheme.colors.success} />
+            )}
+            <Text style={styles.statNumber}>{userRole === 'admin' ? stats.clientes : stats.servicios_completados}</Text>
+            <Text style={styles.statLabel}>{userRole === 'admin' ? 'Clientes' : 'Completados'}</Text>
           </TouchableOpacity>
 
         </View>
       </View>
 
       {/* Recent Services */}
-      {servicios.length > 0 && userRole !== 'admin' && (
+      {servicios.length > 0 && userRole === 'user' && (
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Servicios Recientes</Text>
           {servicios.map((servicio, index) => (
@@ -298,14 +338,37 @@ const HomeScreen = () => {
             >
               <View style={styles.serviceHeader}>
                 <Text style={[styles.serviceIcon, { color: modernTheme.colors.primary }]}>🧹</Text>
-                <Text style={styles.serviceName}>{servicio.nombre || 'Servicio'}</Text>
+                <View style={styles.serviceNameContainer}>
+                  <Text style={styles.serviceName}>{servicio.service_name || 'Servicio'}</Text>
+                  <View style={styles.statusContainer}>
+                    <StatusIcon status={servicio.status} size="xs" />
+                    <Text style={styles.statusText}>{getStatusText(servicio.status)}</Text>
+                  </View>
+                </View>
               </View>
               <Text style={styles.serviceDescription}>
-                {servicio.descripcion || 'Sin descripción disponible'}
+                {servicio.address || 'Sin dirección disponible'}
               </Text>
-              <Text style={styles.servicePrice}>
-                ${servicio.precio || 'N/A'}
-              </Text>
+              <View style={styles.serviceDetails}>
+                <View style={styles.serviceDetail}>
+                  <MaterialIcons name="calendar-today" size={14} color={modernTheme.colors.text.secondary} />
+                  <Text style={styles.serviceDetailText}>
+                    {servicio.assigned_date ? new Date(servicio.assigned_date).toLocaleDateString() : 'Fecha no disponible'}
+                  </Text>
+                </View>
+                <View style={styles.serviceDetail}>
+                  <MaterialIcons name="schedule" size={14} color={modernTheme.colors.text.secondary} />
+                  <Text style={styles.serviceDetailText}>
+                    {servicio.shift === 'morning' ? 'Mañana' : servicio.shift === 'afternoon' ? 'Tarde' : servicio.shift || 'Horario no disponible'}
+                  </Text>
+                </View>
+                <View style={styles.serviceDetail}>
+                  <MaterialIcons name="attach-money" size={14} color={modernTheme.colors.text.secondary} />
+                  <Text style={styles.serviceDetailText}>
+                    ${servicio.price || servicio.cost || 'N/A'}
+                  </Text>
+                </View>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
@@ -501,7 +564,7 @@ const styles = StyleSheet.create({
     ...modernTheme.typography.caption,
     color: modernTheme.colors.text.secondary,
     textAlign: 'center',
-    fontSize: 10,
+    fontSize: 9,
   },
 
   // Section styles
@@ -524,6 +587,36 @@ const styles = StyleSheet.create({
     marginBottom: modernTheme.spacing.md,
     borderLeftWidth: 3,
     borderLeftColor: modernTheme.colors.primary,
+  },
+  serviceNameContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  serviceDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: modernTheme.spacing.sm,
+  },
+  serviceDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  serviceDetailText: {
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginLeft: modernTheme.spacing.xs,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    ...modernTheme.typography.bodySmall,
+    color: modernTheme.colors.text.secondary,
+    marginLeft: modernTheme.spacing.xs,
   },
   serviceHeader: {
     flexDirection: 'row',

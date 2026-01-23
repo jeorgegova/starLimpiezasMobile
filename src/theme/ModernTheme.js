@@ -124,7 +124,7 @@ export const typography = {
   caption: {
     fontSize: 11,
     fontWeight: '500',
-    lineHeight: 16,
+    lineHeight: 14,
     color: colors.text.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5
