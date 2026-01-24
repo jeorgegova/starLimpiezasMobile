@@ -717,10 +717,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: modernTheme.spacing.sm,
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   userStatus: {
     ...modernTheme.typography.bodySmall,
     marginLeft: modernTheme.spacing.sm,

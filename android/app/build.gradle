@@ -107,6 +107,12 @@ android {
     }
 }
 
+tasks.whenTaskAdded { task ->
+    if (task.name == 'compileReleaseArtProfile') {
+        task.enabled = false
+    }
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

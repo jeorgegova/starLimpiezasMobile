@@ -201,7 +201,6 @@ const AppNavigator = () => {
   // Show loading during initialization
   if (initializing || loading) {
     return <SimpleLoadingScreen message="Iniciando aplicación..." />;
-    return null; // Auth context will handle loading screen
   }
 
   return (
